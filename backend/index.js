@@ -372,20 +372,4 @@ out center;
 // SERVER STARTEN
 // --------------------------------------------------
 
-app.listen(
-  PORT,
-  "0.0.0.0",
-  () => {
-
-    console.log("");
-
-    console.log(
-      `🚒 Omgevingsscan backend draait op poort ${PORT}`
-    );
-
-    console.log(
-      `🌍 http://localhost:${PORT}`
-    );
-
-  }
-);
+module.exports = app;
