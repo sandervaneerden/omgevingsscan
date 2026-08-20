@@ -1,0 +1,18 @@
+.header {
+  background: #0b2d4d;
+  color: white;
+  padding: 30px;
+  display: flex;
+  align-items: center;
+}
+
+.header h1 {
+  margin: 0 0 8px 0;
+  font-size: 32px;
+}
+
+.header p {
+  margin: 0;
+  font-size: 16px;
+  opacity: 0.9;
+}
