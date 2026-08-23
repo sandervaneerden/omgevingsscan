@@ -16,14 +16,18 @@ import RiskArea from "./RiskArea";
 import MapUpdater from "./MapUpdater";
 import VulnerableObjects from "./VulnerableObjects";
 
-import type { VulnerableObject } from "./VulnerableObjects";
+import type {
+  VulnerableObject
+} from "../services/vulnerableObjectService";
 
 
-// =========================
-// LEAFLET MARKER
-// =========================
+// ======================================================
+// LEAFLET MARKER CORRECT LADEN IN VITE
+// ======================================================
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (
+  L.Icon.Default.prototype as any
+)._getIconUrl;
 
 L.Icon.Default.mergeOptions({
 
@@ -39,21 +43,9 @@ L.Icon.Default.mergeOptions({
 });
 
 
-// =========================
-// TYPES
-// =========================
-
-interface VisibleVulnerableObject
-  extends VulnerableObject {
-
-  distance: number;
-
-  insideCircle: boolean;
-
-  insideGasZone: boolean;
-
-}
-
+// ======================================================
+// PROPS
+// ======================================================
 
 interface MapViewProps {
 
@@ -65,20 +57,18 @@ interface MapViewProps {
 
   windSpeed: number;
 
-  onGasZoneCreated?: (
-    zone: [number, number][]
-  ) => void;
+  objects: VulnerableObject[];
 
-  onVisibleObjectsChange?: (
-    objects: VisibleVulnerableObject[]
+  onGasZoneChange: (
+    zone: [number, number][]
   ) => void;
 
 }
 
 
-// =========================
+// ======================================================
 // MAPVIEW
-// =========================
+// ======================================================
 
 function MapView({
 
@@ -90,12 +80,16 @@ function MapView({
 
   windSpeed,
 
-  onGasZoneCreated,
+  objects,
 
-  onVisibleObjectsChange
+  onGasZoneChange
 
 }: MapViewProps) {
 
+
+  // ====================================================
+  // INCIDENTLOCATIE
+  // ====================================================
 
   const position: [number, number] = [
 
@@ -106,45 +100,51 @@ function MapView({
   ];
 
 
+  // ====================================================
+  // GASZONE
+  // ====================================================
+
   const [gasZone, setGasZone] =
     useState<[number, number][]>([]);
 
 
-  // =========================
+  // ====================================================
   // WINDRICHTING
-  // =========================
-
-  // Wind komt uit deze richting.
+  //
+  // windDirection = richting waar de wind vandaan komt
+  //
   // Gas verspreidt zich met de wind mee.
+  // Daarom 180 graden draaien.
+  // ====================================================
 
   const dispersionDirection =
     (windDirection + 180) % 360;
 
 
-  // =========================
-  // GASZONE
-  // =========================
+  // ====================================================
+  // GASZONE BIJWERKEN
+  // ====================================================
 
-  function handleZoneCreated(
+  function handleGasZoneCreated(
     zone: [number, number][]
   ) {
 
     console.log(
-      "🔴 Gaszone ontvangen:",
+      "🔴 Nieuwe gaszone ontvangen:",
       zone.length,
       "punten"
     );
 
     setGasZone(zone);
 
-    onGasZoneCreated?.(zone);
+    onGasZoneChange(zone);
 
   }
 
 
-  // =========================
+  // ====================================================
   // RENDER
-  // =========================
+  // ====================================================
 
   return (
 
@@ -165,9 +165,9 @@ function MapView({
     >
 
 
-      {/* =========================
-          KAART BIJWERKEN
-      ========================= */}
+      {/* ================================================
+          KAART AUTOMATISCH NAAR NIEUWE LOCATIE
+          ================================================ */}
 
       <MapUpdater
 
@@ -178,9 +178,9 @@ function MapView({
       />
 
 
-      {/* =========================
+      {/* ================================================
           OPENSTREETMAP
-      ========================= */}
+          ================================================ */}
 
       <TileLayer
 
@@ -191,9 +191,9 @@ function MapView({
       />
 
 
-      {/* =========================
+      {/* ================================================
           INCIDENTLOCATIE
-      ========================= */}
+          ================================================ */}
 
       <Marker
 
@@ -203,13 +203,12 @@ function MapView({
 
         <Popup>
 
-          <b>
-            Incidentlocatie
-          </b>
+          <b>Incidentlocatie</b>
 
           <br />
 
-          {latitude.toFixed(5)},{" "}
+          {latitude.toFixed(5)},
+          {" "}
           {longitude.toFixed(5)}
 
         </Popup>
@@ -217,9 +216,9 @@ function MapView({
       </Marker>
 
 
-      {/* =========================
-          500 METER ZOEKCIRKEL
-      ========================= */}
+      {/* ================================================
+          VASTE ZOEKCIRKEL VAN 500 METER
+          ================================================ */}
 
       <Circle
 
@@ -242,9 +241,9 @@ function MapView({
       />
 
 
-      {/* =========================
+      {/* ================================================
           GASZONE
-      ========================= */}
+          ================================================ */}
 
       <RiskArea
 
@@ -256,19 +255,25 @@ function MapView({
 
         windSpeed={windSpeed}
 
-        onZoneCreated={handleZoneCreated}
+        onZoneCreated={
+          handleGasZoneCreated
+        }
 
       />
 
 
-      {/* =========================
+      {/* ================================================
           KWETSBARE OBJECTEN
           
-          Objecten binnen:
-          - 500 meter
-          OF
-          - gaszone
-      ========================= */}
+          BELANGRIJK:
+          Deze component doet GEEN API-call.
+
+          De objecten zijn al door App.tsx opgehaald
+          met een zoekradius van 1000 meter.
+
+          Hierdoor gebruiken kaart en lijst dezelfde
+          dataset.
+          ================================================ */}
 
       <VulnerableObjects
 
@@ -278,9 +283,7 @@ function MapView({
 
         gasZone={gasZone}
 
-        onVisibleObjectsChange={
-          onVisibleObjectsChange
-        }
+        objects={objects}
 
       />
 
