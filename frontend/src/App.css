@@ -51,11 +51,13 @@
   width: min(900px, calc(100% - 40px));
 
   margin: 28px auto 24px auto;
+
   padding: 24px;
 
   background: #101820;
 
   border: 1px solid #202b36;
+
   border-radius: 10px;
 
   box-shadow:
@@ -68,6 +70,7 @@
   text-align: center;
 
   font-size: 18px;
+
   color: #ffffff;
 }
 
@@ -99,6 +102,7 @@
   background: #101820;
 
   border: 1px solid #202b36;
+
   border-radius: 10px;
 
   overflow: hidden;
@@ -109,9 +113,11 @@
 
 .panel h2 {
   margin: 0;
+
   padding: 18px 20px;
 
   font-size: 17px;
+
   font-weight: 600;
 
   color: #ffffff;
@@ -139,59 +145,241 @@
   min-height: 220px;
 }
 
-.object-summary {
+
+/* Titel + aantal */
+
+.panel-title-row {
   display: flex;
 
   align-items: center;
 
-  gap: 30px;
+  justify-content: space-between;
 
-  padding: 24px;
+  background: #121c25;
+
+  border-bottom: 1px solid #202b36;
 }
 
-.object-count {
-  min-width: 120px;
+.panel-title-row h2 {
+  flex: 1;
 
-  text-align: center;
+  border-bottom: none;
+}
 
-  padding: 18px;
+
+/* Aantal objecten */
+
+.object-total {
+  margin-right: 20px;
+
+  min-width: 30px;
+
+  height: 30px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  padding: 0 9px;
+
+  background: #22c55e;
+
+  color: #061009;
+
+  border-radius: 15px;
+
+  font-size: 13px;
+
+  font-weight: 700;
+}
+
+
+/* Objectenlijst */
+
+.objects-list {
+  max-height: 280px;
+
+  overflow-y: auto;
+}
+
+
+/* Scrollbar */
+
+.objects-list::-webkit-scrollbar {
+  width: 7px;
+}
+
+.objects-list::-webkit-scrollbar-track {
+  background: #0b1117;
+}
+
+.objects-list::-webkit-scrollbar-thumb {
+  background: #2b3946;
+
+  border-radius: 10px;
+}
+
+.objects-list::-webkit-scrollbar-thumb:hover {
+  background: #3c4b59;
+}
+
+
+/* Objectregel */
+
+.object-row {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 12px 16px;
+
+  border-bottom: 1px solid #202b36;
+
+  transition:
+    background 0.15s ease;
+}
+
+.object-row:last-child {
+  border-bottom: none;
+}
+
+.object-row:hover {
+  background: #151e27;
+}
+
+
+/* Objecticoon */
+
+.object-icon {
+  width: 38px;
+
+  min-width: 38px;
+
+  height: 38px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
 
   background: #0b1117;
 
   border: 1px solid #27333e;
 
-  border-radius: 8px;
+  border-radius: 7px;
+
+  font-size: 20px;
 }
 
-.object-count-number {
-  display: block;
 
-  font-size: 34px;
-  font-weight: 700;
+/* Objectinformatie */
 
-  color: #4ade80;
+.object-details {
+  flex: 1;
+
+  min-width: 0;
 }
 
-.object-count-label {
-  display: block;
+.object-name {
+  color: #ffffff;
 
-  margin-top: 4px;
+  font-size: 14px;
+
+  font-weight: 600;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.object-type {
+  margin-top: 2px;
+
+  color: #8996a3;
 
   font-size: 12px;
 
-  color: #8996a3;
+  text-transform: capitalize;
 }
 
-.object-info {
-  color: #9ba7b3;
+
+/* Afstand */
+
+.object-distance {
+  color: #4ade80;
 
   font-size: 13px;
 
-  line-height: 1.6;
+  font-weight: 600;
+
+  white-space: nowrap;
 }
 
-.object-info p {
-  margin: 0 0 8px 0;
+
+/* Laden */
+
+.objects-loading {
+  padding: 35px 20px;
+
+  text-align: center;
+
+  color: #8996a3;
+
+  font-size: 13px;
+}
+
+
+/* Geen objecten */
+
+.objects-empty {
+  min-height: 170px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 10px;
+
+  padding: 30px 20px;
+
+  text-align: center;
+
+  color: #8996a3;
+
+  font-size: 13px;
+}
+
+.empty-icon {
+  width: 42px;
+
+  height: 42px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: rgba(34, 197, 94, 0.12);
+
+  color: #4ade80;
+
+  font-size: 20px;
+
+  font-weight: 700;
 }
 
 
@@ -289,6 +477,7 @@
   position: absolute;
 
   left: 0;
+
   top: 100%;
 
   margin: 6px 0 0 0;
@@ -300,7 +489,7 @@
 
 
 /* =========================
-   LEAFLET KAART
+   LEAFLET
    ========================= */
 
 .leaflet-container {
@@ -320,7 +509,7 @@
 
 
 /* =========================
-   MOBIELE WEERGAVE
+   MOBIEL
    ========================= */
 
 @media (max-width: 800px) {
@@ -361,8 +550,12 @@
     height: 45px;
   }
 
-  .object-summary {
-    flex-direction: column;
+  .object-row {
+    padding: 11px 12px;
+  }
+
+  .object-name {
+    font-size: 13px;
   }
 
 }
