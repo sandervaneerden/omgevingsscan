@@ -1,3 +1,7 @@
+/* =========================
+   BASIS
+   ========================= */
+
 .app {
   min-height: 100vh;
   background: #080c11;
@@ -12,18 +16,28 @@
 .header {
   background: #0d141c;
   border-bottom: 1px solid #202b36;
+
   padding: 24px 40px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  text-align: center;
 }
 
 .header h1 {
   margin: 0 0 6px 0;
+
   font-size: 30px;
   font-weight: 700;
+
   color: #ffffff;
 }
 
 .header p {
   margin: 0;
+
   color: #8996a3;
   font-size: 14px;
 }
@@ -35,17 +49,24 @@
 
 .search-panel {
   width: min(900px, calc(100% - 40px));
+
   margin: 28px auto 24px auto;
   padding: 24px;
+
   background: #101820;
+
   border: 1px solid #202b36;
   border-radius: 10px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.25);
 }
 
 .search-panel h2 {
   margin: 0 0 16px 0;
+
   text-align: center;
+
   font-size: 18px;
   color: #ffffff;
 }
@@ -57,6 +78,7 @@
 
 .dashboard {
   width: min(1400px, calc(100% - 40px));
+
   margin: 0 auto 40px auto;
 
   display: grid;
@@ -75,8 +97,10 @@
 
 .panel {
   background: #101820;
+
   border: 1px solid #202b36;
   border-radius: 10px;
+
   overflow: hidden;
 
   box-shadow:
@@ -93,6 +117,7 @@
   color: #ffffff;
 
   background: #121c25;
+
   border-bottom: 1px solid #202b36;
 }
 
@@ -116,7 +141,9 @@
 
 .object-summary {
   display: flex;
+
   align-items: center;
+
   gap: 30px;
 
   padding: 24px;
@@ -124,12 +151,15 @@
 
 .object-count {
   min-width: 120px;
+
   text-align: center;
 
   padding: 18px;
 
   background: #0b1117;
+
   border: 1px solid #27333e;
+
   border-radius: 8px;
 }
 
@@ -148,12 +178,15 @@
   margin-top: 4px;
 
   font-size: 12px;
+
   color: #8996a3;
 }
 
 .object-info {
   color: #9ba7b3;
+
   font-size: 13px;
+
   line-height: 1.6;
 }
 
@@ -172,6 +205,7 @@
 
 .map-panel h2 {
   display: flex;
+
   align-items: center;
 }
 
@@ -184,6 +218,7 @@
   position: relative;
 
   display: flex;
+
   gap: 10px;
 
   width: 100%;
@@ -197,9 +232,11 @@
   padding: 13px 15px;
 
   background: #0a1016;
+
   color: #ffffff;
 
   border: 1px solid #2b3946;
+
   border-radius: 7px;
 
   font-size: 14px;
@@ -213,19 +250,24 @@
 
 .search-container input:focus {
   border-color: #4ade80;
-  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.12);
+
+  box-shadow:
+    0 0 0 2px rgba(74, 222, 128, 0.12);
 }
 
 .search-container button {
   padding: 0 24px;
 
   background: #22c55e;
+
   color: #061009;
 
   border: none;
+
   border-radius: 7px;
 
   font-weight: 700;
+
   font-size: 14px;
 
   cursor: pointer;
@@ -252,12 +294,13 @@
   margin: 6px 0 0 0;
 
   color: #f87171;
+
   font-size: 13px;
 }
 
 
 /* =========================
-   LEAFLET
+   LEAFLET KAART
    ========================= */
 
 .leaflet-container {
@@ -267,6 +310,7 @@
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
   background: #151e27;
+
   color: #ffffff;
 }
 
@@ -276,7 +320,7 @@
 
 
 /* =========================
-   MOBIEL
+   MOBIELE WEERGAVE
    ========================= */
 
 @media (max-width: 800px) {
@@ -289,8 +333,13 @@
     font-size: 24px;
   }
 
+  .header p {
+    font-size: 13px;
+  }
+
   .search-panel {
     width: calc(100% - 24px);
+
     margin-top: 16px;
   }
 

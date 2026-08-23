@@ -38,7 +38,7 @@ function App() {
       {/* HEADER */}
       <header className="header">
         <div>
-          <h1>Omgevingsscan Pro</h1>
+          <h1>Omgevingsscan CaCo</h1>
           <p>
             Incidentondersteuning • Omgevingsanalyse • Veiligheidsbeeld
           </p>
