@@ -3,7 +3,7 @@ import { Marker, Popup } from "react-leaflet";
 import { getVulnerableObjects } from "../services/vulnerableObjectService";
 import L from "leaflet";
 
-interface VulnerableObject {
+export interface VulnerableObject {
   id: string;
   name: string;
   type: string;
@@ -15,6 +15,7 @@ interface Props {
   latitude: number;
   longitude: number;
   gasZone?: [number, number][];
+  onVisibleObjectsChange?: (objects: VulnerableObject[]) => void;
 }
 
 function distanceInMeters(
@@ -116,7 +117,8 @@ function iconForType(type: string) {
 export default function VulnerableObjects({
   latitude,
   longitude,
-  gasZone
+  gasZone,
+  onVisibleObjectsChange
 }: Props) {
   const [objects, setObjects] =
     useState<VulnerableObject[]>([]);
@@ -147,15 +149,28 @@ export default function VulnerableObjects({
           "Object fout:",
           error
         );
+
+        setObjects([]);
       }
     }
 
     load();
   }, [latitude, longitude]);
 
-console.log("🟢 Totaal opgehaalde objecten:", objects.length);
-console.log("🔴 Gaszone punten:", gasZone?.length ?? 0);
-console.log("🟡 Gaszone:", gasZone);
+  console.log(
+    "🟢 Totaal opgehaalde objecten:",
+    objects.length
+  );
+
+  console.log(
+    "🔴 Gaszone punten:",
+    gasZone?.length ?? 0
+  );
+
+  console.log(
+    "🟡 Gaszone:",
+    gasZone
+  );
 
   const visibleObjects =
     objects.filter((obj) => {
@@ -187,6 +202,10 @@ console.log("🟡 Gaszone:", gasZone);
     "📍 Zichtbare objecten:",
     visibleObjects.length
   );
+
+  useEffect(() => {
+    onVisibleObjectsChange?.(visibleObjects);
+  }, [visibleObjects, onVisibleObjectsChange]);
 
   return (
     <>
