@@ -30,106 +30,12 @@ function App() {
     useState(false);
 
 
-  async function handleLocationFound(locationData: {
-    address: string;
-    latitude: number;
-    longitude: number;
-  }) {
+  /*
+   * ==========================================
+   * AFSTAND BEREKENEN
+   * ==========================================
+   */
 
-    setLocation(locationData);
-
-    // Meteo ophalen
-    try {
-
-      const weatherData = await getWeather(
-        locationData.latitude,
-        locationData.longitude
-      );
-
-      setWeather(weatherData);
-
-    } catch (error) {
-
-      console.error(
-        "Fout bij ophalen weer:",
-        error
-      );
-
-      setWeather(null);
-    }
-
-
-    // Kwetsbare objecten ophalen
-    setObjectsLoading(true);
-
-    try {
-
-      const objectData =
-        await getVulnerableObjects(
-          locationData.latitude,
-          locationData.longitude,
-          3000
-        );
-
-      setObjects(objectData);
-
-    } catch (error) {
-
-      console.error(
-        "Fout bij ophalen kwetsbare objecten:",
-        error
-      );
-
-      setObjects([]);
-
-    } finally {
-
-      setObjectsLoading(false);
-
-    }
-  }
-
-
-  // Objecten ophalen voor de standaardlocatie
-  useEffect(() => {
-
-    async function loadInitialObjects() {
-
-      setObjectsLoading(true);
-
-      try {
-
-        const result =
-          await getVulnerableObjects(
-            location.latitude,
-            location.longitude,
-            3000
-          );
-
-        setObjects(result);
-
-      } catch (error) {
-
-        console.error(
-          "Fout bij laden objecten:",
-          error
-        );
-
-        setObjects([]);
-
-      } finally {
-
-        setObjectsLoading(false);
-
-      }
-    }
-
-    loadInitialObjects();
-
-  }, []);
-
-
-  // Afstand berekenen
   function distanceInMeters(
     lat1: number,
     lon1: number,
@@ -166,7 +72,166 @@ function App() {
   }
 
 
-  // Alleen objecten binnen 500 meter
+  /*
+   * ==========================================
+   * LOCATIE GEVONDEN
+   * ==========================================
+   */
+
+  async function handleLocationFound(
+    locationData: {
+      address: string;
+      latitude: number;
+      longitude: number;
+    }
+  ) {
+
+    console.log(
+      "📍 Nieuwe incidentlocatie:",
+      locationData
+    );
+
+    setLocation(locationData);
+
+
+    /*
+     * ========================================
+     * METEO OPHALEN
+     * ========================================
+     */
+
+    try {
+
+      const weatherData =
+        await getWeather(
+          locationData.latitude,
+          locationData.longitude
+        );
+
+      console.log(
+        "🌤️ Meteo ontvangen:",
+        weatherData
+      );
+
+      setWeather(weatherData);
+
+    } catch (error) {
+
+      console.error(
+        "❌ Fout bij ophalen weer:",
+        error
+      );
+
+      setWeather(null);
+    }
+
+
+    /*
+     * ========================================
+     * KWETSBARE OBJECTEN OPHALEN
+     * ========================================
+     */
+
+    setObjectsLoading(true);
+
+    try {
+
+      const objectData =
+        await getVulnerableObjects(
+          locationData.latitude,
+          locationData.longitude,
+          3000
+        );
+
+      console.log(
+        "🏢 Kwetsbare objecten ontvangen:",
+        objectData.length
+      );
+
+      console.log(
+        "📋 Objecten:",
+        objectData
+      );
+
+      setObjects(objectData);
+
+    } catch (error) {
+
+      console.error(
+        "❌ Fout bij ophalen kwetsbare objecten:",
+        error
+      );
+
+      setObjects([]);
+
+    } finally {
+
+      setObjectsLoading(false);
+
+    }
+  }
+
+
+  /*
+   * ==========================================
+   * OBJECTEN VOOR STARTLOCATIE
+   * ==========================================
+   */
+
+  useEffect(() => {
+
+    async function loadInitialObjects() {
+
+      setObjectsLoading(true);
+
+      try {
+
+        const result =
+          await getVulnerableObjects(
+            location.latitude,
+            location.longitude,
+            3000
+          );
+
+        console.log(
+          "🏢 Initiële objecten:",
+          result.length
+        );
+
+        setObjects(result);
+
+      } catch (error) {
+
+        console.error(
+          "❌ Fout bij laden objecten:",
+          error
+        );
+
+        setObjects([]);
+
+      } finally {
+
+        setObjectsLoading(false);
+
+      }
+    }
+
+    loadInitialObjects();
+
+  }, []);
+
+
+  /*
+   * ==========================================
+   * OBJECTEN VOOR DE LIJST
+   *
+   * We gebruiken hier dezelfde objecten die
+   * door de backend zijn opgehaald.
+   *
+   * De backend zoekt binnen 3000 meter.
+   * ==========================================
+   */
+
   const visibleObjects =
     objects
       .map((obj) => {
@@ -185,16 +250,18 @@ function App() {
         };
 
       })
-      .filter(
-        (obj) => obj.distance <= 500
-      )
       .sort(
         (a, b) =>
           a.distance - b.distance
       );
 
 
-  // Icoon bepalen
+  /*
+   * ==========================================
+   * ICOON PER TYPE
+   * ==========================================
+   */
+
   function iconForType(type: string) {
 
     switch (type) {
@@ -220,14 +287,20 @@ function App() {
   }
 
 
+  /*
+   * ==========================================
+   * RENDER
+   * ==========================================
+   */
+
   return (
 
     <div className="app">
 
 
-      {/* =========================
+      {/* =====================================
           HEADER
-      ========================= */}
+      ===================================== */}
 
       <header className="header">
 
@@ -246,9 +319,9 @@ function App() {
       </header>
 
 
-      {/* =========================
+      {/* =====================================
           ZOEKEN
-      ========================= */}
+      ===================================== */}
 
       <section className="search-panel">
 
@@ -265,16 +338,16 @@ function App() {
       </section>
 
 
-      {/* =========================
+      {/* =====================================
           DASHBOARD
-      ========================= */}
+      ===================================== */}
 
       <main className="dashboard">
 
 
-        {/* =========================
+        {/* ===================================
             METEO
-        ========================= */}
+        =================================== */}
 
         <section className="panel weather-panel">
 
@@ -289,9 +362,9 @@ function App() {
         </section>
 
 
-        {/* =========================
+        {/* ===================================
             KWETSBARE OBJECTEN
-        ========================= */}
+        =================================== */}
 
         <section className="panel objects-panel">
 
@@ -302,22 +375,32 @@ function App() {
             </h2>
 
             <span className="object-total">
+
               {objectsLoading
                 ? "..."
                 : visibleObjects.length
               }
+
             </span>
 
           </div>
 
 
+          {/* LADEN */}
+
           {objectsLoading ? (
 
             <div className="objects-loading">
+
               Objecten worden opgehaald...
+
             </div>
 
+
           ) : visibleObjects.length === 0 ? (
+
+
+            /* GEEN OBJECTEN */
 
             <div className="objects-empty">
 
@@ -326,12 +409,16 @@ function App() {
               </div>
 
               <div>
-                Geen kwetsbare objecten binnen 500 meter gevonden.
+                Geen kwetsbare objecten gevonden.
               </div>
 
             </div>
 
+
           ) : (
+
+
+            /* OBJECTENLIJST */
 
             <div className="objects-list">
 
@@ -352,11 +439,15 @@ function App() {
                   <div className="object-details">
 
                     <div className="object-name">
+
                       {obj.name}
+
                     </div>
 
                     <div className="object-type">
+
                       {obj.type}
+
                     </div>
 
                   </div>
@@ -365,10 +456,15 @@ function App() {
                   <div className="object-distance">
 
                     {obj.distance < 1000
-                      ? `${Math.round(obj.distance)} m`
+
+                      ? `${Math.round(
+                          obj.distance
+                        )} m`
+
                       : `${(
                           obj.distance / 1000
                         ).toFixed(1)} km`
+
                     }
 
                   </div>
@@ -384,9 +480,9 @@ function App() {
         </section>
 
 
-        {/* =========================
+        {/* ===================================
             KAART
-        ========================= */}
+        =================================== */}
 
         <section className="panel map-panel">
 
@@ -395,6 +491,7 @@ function App() {
           </h2>
 
           <MapView
+
             latitude={
               location.latitude
             }
