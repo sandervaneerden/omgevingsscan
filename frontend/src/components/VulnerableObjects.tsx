@@ -12,11 +12,8 @@ export interface VulnerableObject {
 interface Props {
   latitude: number;
   longitude: number;
-  objects: VulnerableObject[];
   gasZone?: [number, number][];
-  onVisibleObjectsChange?: (
-    objects: VulnerableObject[]
-  ) => void;
+  objects: VulnerableObject[];
 }
 
 function distanceInMeters(
@@ -36,11 +33,9 @@ function distanceInMeters(
   const a =
     Math.sin(dLat / 2) *
       Math.sin(dLat / 2) +
-
     Math.cos(lat1 * Math.PI / 180) *
       Math.cos(lat2 * Math.PI / 180) *
-
-    Math.sin(dLon / 2) *
+      Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
 
   const c =
@@ -58,7 +53,6 @@ function pointInGasZone(
   longitude: number,
   zone: [number, number][]
 ): boolean {
-
   if (zone.length < 3) {
     return false;
   }
@@ -70,7 +64,6 @@ function pointInGasZone(
     i < zone.length;
     j = i++
   ) {
-
     const lat1 = zone[i][0];
     const lon1 = zone[i][1];
 
@@ -80,7 +73,6 @@ function pointInGasZone(
     const intersect =
       (lon1 > longitude) !==
         (lon2 > longitude) &&
-
       latitude <
         ((lat2 - lat1) *
           (longitude - lon1)) /
@@ -96,38 +88,33 @@ function pointInGasZone(
 }
 
 function iconForType(type: string) {
-
   let icon = "📍";
 
-  switch (type) {
+  if (type === "school") {
+    icon = "🏫";
+  }
 
-    case "school":
-      icon = "🏫";
-      break;
+  if (type === "hospital") {
+    icon = "🏥";
+  }
 
-    case "hospital":
-      icon = "🏥";
-      break;
+  if (type === "church") {
+    icon = "⛪";
+  }
 
-    case "church":
-      icon = "⛪";
-      break;
+  if (type === "shop") {
+    icon = "🏪";
+  }
 
-    case "shop":
-      icon = "🏪";
-      break;
-
-    case "community":
-      icon = "🏢";
-      break;
-
-    default:
-      icon = "📍";
+  if (type === "community") {
+    icon = "🏢";
   }
 
   return L.divIcon({
     html:
-      `<div style="font-size:24px">${icon}</div>`,
+      '<div style="font-size:24px">' +
+      icon +
+      "</div>",
     className: ""
   });
 }
@@ -135,50 +122,54 @@ function iconForType(type: string) {
 export default function VulnerableObjects({
   latitude,
   longitude,
-  objects,
   gasZone,
-  onVisibleObjectsChange
+  objects
 }: Props) {
+  const visibleObjects =
+    objects.filter((obj) => {
 
-  const visibleObjects = objects.filter((obj) => {
+      const distance =
+        distanceInMeters(
+          latitude,
+          longitude,
+          obj.latitude,
+          obj.longitude
+        );
 
-    const distance =
-      distanceInMeters(
-        latitude,
-        longitude,
-        obj.latitude,
-        obj.longitude
+      const insideCircle =
+        distance <= 1000;
+
+      const insideGasZone =
+        pointInGasZone(
+          obj.latitude,
+          obj.longitude,
+          gasZone ?? []
+        );
+
+      return (
+        insideCircle ||
+        insideGasZone
       );
-
-    const insideCircle =
-      distance <= 500;
-
-    const insideGasZone =
-      pointInGasZone(
-        obj.latitude,
-        obj.longitude,
-        gasZone ?? []
-      );
-
-    return (
-      insideCircle ||
-      insideGasZone
-    );
-  });
+    });
 
   console.log(
-    "📍 Objecten zichtbaar op kaart:",
-    visibleObjects.length
+    "🟢 Totaal objecten:",
+    objects.length
   );
 
-  onVisibleObjectsChange?.(
-    visibleObjects
+  console.log(
+    "🔵 Gaszone punten:",
+    gasZone?.length ?? 0
+  );
+
+  console.log(
+    "📍 Zichtbare objecten:",
+    visibleObjects.length
   );
 
   return (
     <>
       {visibleObjects.map((obj) => (
-
         <Marker
           key={obj.id}
           position={[
@@ -187,21 +178,12 @@ export default function VulnerableObjects({
           ]}
           icon={iconForType(obj.type)}
         >
-
           <Popup>
-
-            <b>
-              {obj.name}
-            </b>
-
+            <b>{obj.name}</b>
             <br />
-
             {obj.type}
-
           </Popup>
-
         </Marker>
-
       ))}
     </>
   );

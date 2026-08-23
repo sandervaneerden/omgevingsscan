@@ -1,13 +1,10 @@
-import {
-  useCallback,
-  useState
-} from "react";
+import { useState } from "react";
 
 import "./App.css";
 
-import MapView from "./components/MapView";
 import SearchBar from "./components/SearchBar";
 import WeatherPanel from "./components/WeatherPanel";
+import MapView from "./components/MapView";
 
 import {
   getWeather
@@ -17,6 +14,10 @@ import type {
   WeatherResult
 } from "./services/weatherService";
 
+import {
+  getVulnerableObjects
+} from "./services/vulnerableObjectService";
+
 import type {
   VulnerableObject
 } from "./services/vulnerableObjectService";
@@ -24,10 +25,9 @@ import type {
 
 function App() {
 
-
-  // ===================================================
+  // ============================================
   // LOCATIE
-  // ===================================================
+  // ============================================
 
   const [
     location,
@@ -43,9 +43,9 @@ function App() {
   });
 
 
-  // ===================================================
+  // ============================================
   // WEER
-  // ===================================================
+  // ============================================
 
   const [
     weather,
@@ -55,29 +55,74 @@ function App() {
   );
 
 
-  // ===================================================
-  // ZICHTBARE OBJECTEN
-  // ===================================================
+  // ============================================
+  // OBJECTEN
+  // ============================================
 
   const [
-    visibleObjects,
-    setVisibleObjects
+    objects,
+    setObjects
   ] = useState<VulnerableObject[]>([]);
 
-
-  // ===================================================
-  // OBJECTEN LADEN
-  // ===================================================
 
   const [
     objectsLoading,
     setObjectsLoading
-  ] = useState(true);
+  ] = useState(false);
 
 
-  // ===================================================
+  // ============================================
+  // OBJECTEN OPHALEN
+  // ============================================
+
+  async function loadObjects(
+    latitude: number,
+    longitude: number
+  ) {
+
+    console.log(
+      "🔎 Objecten ophalen..."
+    );
+
+    setObjectsLoading(true);
+
+    try {
+
+      const result =
+        await getVulnerableObjects(
+          latitude,
+          longitude,
+          1000
+        );
+
+      console.log(
+        "✅ Objecten ontvangen:",
+        result.length
+      );
+
+      setObjects(result);
+
+    } catch (error) {
+
+      console.error(
+        "❌ Fout bij objecten:",
+        error
+      );
+
+      setObjects([]);
+
+    } finally {
+
+      setObjectsLoading(false);
+
+    }
+
+  }
+
+
+  // ============================================
   // LOCATIE GEVONDEN
-  // ===================================================
+  // ============================================
 
   async function handleLocationFound(
     locationData: {
@@ -88,7 +133,7 @@ function App() {
   ) {
 
     console.log(
-      "📍 Nieuwe incidentlocatie:",
+      "📍 Nieuwe locatie:",
       locationData
     );
 
@@ -98,13 +143,9 @@ function App() {
     );
 
 
-    // Oude lijst leegmaken
-    setVisibleObjects([]);
-
-
-    // ===============================================
-    // METEO
-    // ===============================================
+    // -----------------------------
+    // WEER
+    // -----------------------------
 
     try {
 
@@ -114,7 +155,6 @@ function App() {
           locationData.longitude
         );
 
-
       setWeather(
         weatherData
       );
@@ -122,66 +162,30 @@ function App() {
     } catch (error) {
 
       console.error(
-        "❌ Fout bij ophalen weer:",
+        "❌ Fout bij weer:",
         error
       );
-
 
       setWeather(null);
 
     }
 
+
+    // -----------------------------
+    // OBJECTEN
+    // -----------------------------
+
+    await loadObjects(
+      locationData.latitude,
+      locationData.longitude
+    );
+
   }
 
 
-  // ===================================================
-  // OBJECTEN UIT MAPVIEW
-  // ===================================================
-
-  const handleVisibleObjectsChange =
-    useCallback(
-      (objects: VulnerableObject[]) => {
-
-        console.log(
-          "📋 Objecten voor lijst:",
-          objects.length
-        );
-
-        setVisibleObjects(
-          objects
-        );
-
-      },
-      []
-    );
-
-
-  // ===================================================
-  // LOADING UIT MAPVIEW
-  // ===================================================
-
-  const handleObjectsLoadingChange =
-    useCallback(
-      (loading: boolean) => {
-
-        console.log(
-          loading
-            ? "⏳ Objecten laden..."
-            : "✅ Objecten geladen"
-        );
-
-        setObjectsLoading(
-          loading
-        );
-
-      },
-      []
-    );
-
-
-  // ===================================================
+  // ============================================
   // ICOON
-  // ===================================================
+  // ============================================
 
   function iconForType(
     type: string
@@ -212,18 +216,16 @@ function App() {
   }
 
 
-  // ===================================================
+  // ============================================
   // RENDER
-  // ===================================================
+  // ============================================
 
   return (
 
     <div className="app">
 
 
-      {/* =============================================
-          HEADER
-      ============================================= */}
+      {/* HEADER */}
 
       <header className="header">
 
@@ -242,9 +244,7 @@ function App() {
       </header>
 
 
-      {/* =============================================
-          ZOEKEN
-      ============================================= */}
+      {/* ZOEKEN */}
 
       <section className="search-panel">
 
@@ -253,26 +253,20 @@ function App() {
         </h2>
 
         <SearchBar
-
           onLocationFound={
             handleLocationFound
           }
-
         />
 
       </section>
 
 
-      {/* =============================================
-          DASHBOARD
-      ============================================= */}
+      {/* DASHBOARD */}
 
       <main className="dashboard">
 
 
-        {/* ===========================================
-            METEO
-        =========================================== */}
+        {/* WEER */}
 
         <section className="panel weather-panel">
 
@@ -287,9 +281,7 @@ function App() {
         </section>
 
 
-        {/* ===========================================
-            KWETSBARE OBJECTEN
-        =========================================== */}
+        {/* OBJECTEN */}
 
         <section className="panel objects-panel">
 
@@ -303,17 +295,13 @@ function App() {
 
               {objectsLoading
                 ? "..."
-                : visibleObjects.length
+                : objects.length
               }
 
             </span>
 
           </div>
 
-
-          {/* =========================================
-              LADEN
-          ========================================= */}
 
           {objectsLoading ? (
 
@@ -323,7 +311,7 @@ function App() {
 
             </div>
 
-          ) : visibleObjects.length === 0 ? (
+          ) : objects.length === 0 ? (
 
             <div className="objects-empty">
 
@@ -332,11 +320,7 @@ function App() {
               </div>
 
               <div>
-
-                Geen kwetsbare objecten
-                binnen het huidige
-                risicogebied gevonden.
-
+                Geen kwetsbare objecten gevonden.
               </div>
 
             </div>
@@ -345,16 +329,13 @@ function App() {
 
             <div className="objects-list">
 
-              {visibleObjects.map(
+              {objects.map(
                 (obj) => (
 
                   <div
                     className="object-row"
                     key={obj.id}
                   >
-
-
-                    {/* ICOON */}
 
                     <div className="object-icon">
 
@@ -365,37 +346,17 @@ function App() {
                     </div>
 
 
-                    {/* INFORMATIE */}
-
                     <div className="object-details">
 
                       <div className="object-name">
-
                         {obj.name}
-
                       </div>
 
                       <div className="object-type">
-
                         {obj.type}
-
                       </div>
 
                     </div>
-
-
-                    {/* AFSTAND */}
-
-                    <div className="object-distance">
-
-                      {/* Afstand wordt hier niet opnieuw
-                          berekend. De kaart bepaalt welke
-                          objecten zichtbaar zijn. */}
-
-                      Binnen risicogebied
-
-                    </div>
-
 
                   </div>
 
@@ -409,16 +370,13 @@ function App() {
         </section>
 
 
-        {/* ===========================================
-            KAART
-        =========================================== */}
+        {/* KAART */}
 
         <section className="panel map-panel">
 
           <h2>
             Omgevingskaart
           </h2>
-
 
           <MapView
 
@@ -436,14 +394,6 @@ function App() {
 
             windSpeed={
               weather?.windSpeed ?? 0
-            }
-
-            onVisibleObjectsChange={
-              handleVisibleObjectsChange
-            }
-
-            onObjectsLoadingChange={
-              handleObjectsLoadingChange
             }
 
           />

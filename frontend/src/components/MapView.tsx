@@ -22,9 +22,7 @@ import type {
 } from "../services/vulnerableObjectService";
 
 
-// =====================================================
-// LEAFLET MARKER
-// =====================================================
+// Leaflet marker correct laden in Vite
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 
@@ -40,10 +38,6 @@ L.Icon.Default.mergeOptions({
 });
 
 
-// =====================================================
-// PROPS
-// =====================================================
-
 interface MapViewProps {
   latitude: number;
   longitude: number;
@@ -51,10 +45,6 @@ interface MapViewProps {
   windSpeed: number;
 }
 
-
-// =====================================================
-// MAPVIEW
-// =====================================================
 
 function MapView({
   latitude,
@@ -68,30 +58,14 @@ function MapView({
     longitude
   ];
 
+  const [gasZone, setGasZone] =
+    useState<[number, number][]>([]);
 
-  // ===================================================
-  // GASZONE
-  // ===================================================
-
-  const [
-    gasZone,
-    setGasZone
-  ] = useState<[number, number][]>([]);
+  const [objects, setObjects] =
+    useState<VulnerableObject[]>([]);
 
 
-  // ===================================================
-  // OBJECTEN
-  // ===================================================
-
-  const [
-    objects,
-    setObjects
-  ] = useState<VulnerableObject[]>([]);
-
-
-  // ===================================================
-  // OBJECTEN OPHALEN
-  // ===================================================
+  // Objecten ophalen binnen 1 kilometer
 
   useEffect(() => {
 
@@ -100,7 +74,7 @@ function MapView({
     async function loadObjects() {
 
       console.log(
-        "🔎 Objecten zoeken..."
+        "🔎 Kwetsbare objecten zoeken..."
       );
 
       console.log(
@@ -160,17 +134,12 @@ function MapView({
   ]);
 
 
-  // ===================================================
-  // WIND
-  // ===================================================
+  // Wind komt uit deze richting.
+  // Gas verspreidt zich met de wind mee.
 
   const dispersionDirection =
     (windDirection + 180) % 360;
 
-
-  // ===================================================
-  // RENDER
-  // ===================================================
 
   return (
 
@@ -195,20 +164,18 @@ function MapView({
       />
 
 
-      {/* INCIDENTLOCATIE */}
+      {/* Incidentlocatie */}
 
       <Marker
         position={position}
       >
-
         <Popup>
           Incidentlocatie
         </Popup>
-
       </Marker>
 
 
-      {/* ZOEKGEBIED 1 KM */}
+      {/* Zoekcirkel van 500 meter */}
 
       <Circle
         center={position}
@@ -222,7 +189,7 @@ function MapView({
       />
 
 
-      {/* GASZONE */}
+      {/* Gaszone */}
 
       <RiskArea
         latitude={latitude}
@@ -233,7 +200,7 @@ function MapView({
       />
 
 
-      {/* KWETSBARE OBJECTEN */}
+      {/* Kwetsbare objecten */}
 
       <VulnerableObjects
         latitude={latitude}
