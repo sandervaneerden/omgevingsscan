@@ -11,12 +11,25 @@ export interface VulnerableObject {
   longitude: number;
 }
 
+interface VisibleVulnerableObject extends VulnerableObject {
+  distance: number;
+  insideCircle: boolean;
+  insideGasZone: boolean;
+}
+
 interface Props {
   latitude: number;
   longitude: number;
   gasZone?: [number, number][];
-  onVisibleObjectsChange?: (objects: VulnerableObject[]) => void;
+  onVisibleObjectsChange?: (
+    objects: VisibleVulnerableObject[]
+  ) => void;
 }
+
+
+// =========================
+// AFSTAND
+// =========================
 
 function distanceInMeters(
   lat1: number,
@@ -24,20 +37,28 @@ function distanceInMeters(
   lat2: number,
   lon2: number
 ): number {
+
   const R = 6371000;
 
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const dLat =
+    (lat2 - lat1) * Math.PI / 180;
+
+  const dLon =
+    (lon2 - lon1) * Math.PI / 180;
 
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLat / 2) *
+      Math.sin(dLat / 2) +
+
     Math.cos(lat1 * Math.PI / 180) *
       Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) *
+
+    Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
 
   const c =
-    2 * Math.atan2(
+    2 *
+    Math.atan2(
       Math.sqrt(a),
       Math.sqrt(1 - a)
     );
@@ -45,11 +66,17 @@ function distanceInMeters(
   return R * c;
 }
 
+
+// =========================
+// PUNT IN GASZONE
+// =========================
+
 function pointInGasZone(
   latitude: number,
   longitude: number,
   zone: [number, number][]
 ): boolean {
+
   if (zone.length < 3) {
     return false;
   }
@@ -61,6 +88,7 @@ function pointInGasZone(
     i < zone.length;
     j = i++
   ) {
+
     const lat1 = zone[i][0];
     const lon1 = zone[i][1];
 
@@ -68,9 +96,12 @@ function pointInGasZone(
     const lon2 = zone[j][1];
 
     const intersect =
-      (lon1 > longitude) !== (lon2 > longitude) &&
+      (lon1 > longitude) !==
+        (lon2 > longitude) &&
+
       latitude <
-        ((lat2 - lat1) * (longitude - lon1)) /
+        ((lat2 - lat1) *
+          (longitude - lon1)) /
           (lon2 - lon1) +
           lat1;
 
@@ -82,7 +113,13 @@ function pointInGasZone(
   return inside;
 }
 
+
+// =========================
+// ICOON
+// =========================
+
 function iconForType(type: string) {
+
   let icon = "📍";
 
   if (type === "school") {
@@ -106,26 +143,53 @@ function iconForType(type: string) {
   }
 
   return L.divIcon({
+
     html:
       '<div style="font-size:24px">' +
       icon +
       "</div>",
+
     className: ""
+
   });
 }
 
+
+// =========================
+// COMPONENT
+// =========================
+
 export default function VulnerableObjects({
+
   latitude,
+
   longitude,
+
   gasZone,
+
   onVisibleObjectsChange
+
 }: Props) {
+
+
   const [objects, setObjects] =
     useState<VulnerableObject[]>([]);
 
+
+  // =========================
+  // OBJECTEN OPHALEN
+  // =========================
+
   useEffect(() => {
+
     async function load() {
+
       try {
+
+        console.log(
+          "🔎 Kwetsbare objecten ophalen..."
+        );
+
         const result =
           await getVulnerableObjects(
             latitude,
@@ -134,97 +198,186 @@ export default function VulnerableObjects({
           );
 
         console.log(
-          "Objecten geladen:",
+          "🟢 Objecten opgehaald:",
           result.length
         );
 
-        console.log(
-          "Overpass objecten:",
-          result
-        );
-
         setObjects(result);
+
       } catch (error) {
+
         console.error(
-          "Object fout:",
+          "❌ Object fout:",
           error
         );
 
         setObjects([]);
+
       }
+
     }
 
     load();
+
   }, [latitude, longitude]);
 
-  console.log(
-    "🟢 Totaal opgehaalde objecten:",
-    objects.length
-  );
 
-  console.log(
-    "🔴 Gaszone punten:",
-    gasZone?.length ?? 0
-  );
+  // =========================
+  // ZICHTBARE OBJECTEN
+  // =========================
 
-  console.log(
-    "🟡 Gaszone:",
-    gasZone
-  );
+  const visibleObjects: VisibleVulnerableObject[] =
+    objects
 
-  const visibleObjects =
-    objects.filter((obj) => {
-      const distance =
-        distanceInMeters(
-          latitude,
-          longitude,
-          obj.latitude,
-          obj.longitude
+      .map((obj) => {
+
+        const distance =
+          distanceInMeters(
+            latitude,
+            longitude,
+            obj.latitude,
+            obj.longitude
+          );
+
+        const insideCircle =
+          distance <= 500;
+
+        const insideGasZone =
+          pointInGasZone(
+            obj.latitude,
+            obj.longitude,
+            gasZone ?? []
+          );
+
+        return {
+
+          ...obj,
+
+          distance,
+
+          insideCircle,
+
+          insideGasZone
+
+        };
+
+      })
+
+      .filter((obj) => {
+
+        return (
+          obj.insideCircle ||
+          obj.insideGasZone
         );
 
-      const insideCircle =
-        distance <= 500;
+      })
 
-      const insideGasZone =
-        pointInGasZone(
-          obj.latitude,
-          obj.longitude,
-          gasZone ?? []
-        );
+      .sort((a, b) => {
 
-      return (
-        insideCircle ||
-        insideGasZone
-      );
-    });
+        return a.distance - b.distance;
 
-  console.log(
-    "📍 Zichtbare objecten:",
-    visibleObjects.length
-  );
+      });
+
+
+  // =========================
+  // OBJECTEN DOORGEVEN AAN APP
+  // =========================
 
   useEffect(() => {
-    onVisibleObjectsChange?.(visibleObjects);
-  }, [visibleObjects, onVisibleObjectsChange]);
+
+    console.log(
+      "📍 Zichtbare objecten:",
+      visibleObjects.length
+    );
+
+    console.log(
+      "🔴 Gaszone punten:",
+      gasZone?.length ?? 0
+    );
+
+    onVisibleObjectsChange?.(
+      visibleObjects
+    );
+
+  }, [
+    objects,
+    gasZone,
+    latitude,
+    longitude,
+    onVisibleObjectsChange
+  ]);
+
+
+  // =========================
+  // KAARTMARKERS
+  // =========================
 
   return (
+
     <>
+
       {visibleObjects.map((obj) => (
+
         <Marker
+
           key={obj.id}
+
           position={[
             obj.latitude,
             obj.longitude
           ]}
-          icon={iconForType(obj.type)}
+
+          icon={
+            iconForType(obj.type)
+          }
+
         >
+
           <Popup>
-            <b>{obj.name}</b>
+
+            <b>
+              {obj.name}
+            </b>
+
             <br />
+
             {obj.type}
+
+            <br />
+
+            <br />
+
+            Afstand:{" "}
+
+            {obj.distance < 1000
+
+              ? `${Math.round(
+                  obj.distance
+                )} meter`
+
+              : `${(
+                  obj.distance / 1000
+                ).toFixed(1)} km`
+
+            }
+
+            {obj.insideGasZone &&
+              !obj.insideCircle && (
+
+              <>
+                <br />
+                <b>⚠️ Binnen gaszone</b>
+              </>
+
+            )}
+
           </Popup>
+
         </Marker>
+
       ))}
+
     </>
+
   );
 }

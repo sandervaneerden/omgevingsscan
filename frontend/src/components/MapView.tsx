@@ -16,8 +16,12 @@ import RiskArea from "./RiskArea";
 import MapUpdater from "./MapUpdater";
 import VulnerableObjects from "./VulnerableObjects";
 
+import type { VulnerableObject } from "./VulnerableObjects";
 
-// Leaflet marker correct laden in Vite
+
+// =========================
+// LEAFLET MARKER
+// =========================
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 
@@ -35,6 +39,22 @@ L.Icon.Default.mergeOptions({
 });
 
 
+// =========================
+// TYPES
+// =========================
+
+interface VisibleVulnerableObject
+  extends VulnerableObject {
+
+  distance: number;
+
+  insideCircle: boolean;
+
+  insideGasZone: boolean;
+
+}
+
+
 interface MapViewProps {
 
   latitude: number;
@@ -49,8 +69,16 @@ interface MapViewProps {
     zone: [number, number][]
   ) => void;
 
+  onVisibleObjectsChange?: (
+    objects: VisibleVulnerableObject[]
+  ) => void;
+
 }
 
+
+// =========================
+// MAPVIEW
+// =========================
 
 function MapView({
 
@@ -62,7 +90,9 @@ function MapView({
 
   windSpeed,
 
-  onGasZoneCreated
+  onGasZoneCreated,
+
+  onVisibleObjectsChange
 
 }: MapViewProps) {
 
@@ -76,35 +106,45 @@ function MapView({
   ];
 
 
-  const [gasZone, setGasZone] = useState<
+  const [gasZone, setGasZone] =
+    useState<[number, number][]>([]);
 
-    [number, number][]
 
-  >([]);
-
+  // =========================
+  // WINDRICHTING
+  // =========================
 
   // Wind komt uit deze richting.
   // Gas verspreidt zich met de wind mee.
 
   const dispersionDirection =
-
     (windDirection + 180) % 360;
 
+
+  // =========================
+  // GASZONE
+  // =========================
 
   function handleZoneCreated(
     zone: [number, number][]
   ) {
 
+    console.log(
+      "🔴 Gaszone ontvangen:",
+      zone.length,
+      "punten"
+    );
+
     setGasZone(zone);
 
-    if (onGasZoneCreated) {
-
-      onGasZoneCreated(zone);
-
-    }
+    onGasZoneCreated?.(zone);
 
   }
 
+
+  // =========================
+  // RENDER
+  // =========================
 
   return (
 
@@ -125,6 +165,10 @@ function MapView({
     >
 
 
+      {/* =========================
+          KAART BIJWERKEN
+      ========================= */}
+
       <MapUpdater
 
         latitude={latitude}
@@ -133,6 +177,10 @@ function MapView({
 
       />
 
+
+      {/* =========================
+          OPENSTREETMAP
+      ========================= */}
 
       <TileLayer
 
@@ -143,6 +191,10 @@ function MapView({
       />
 
 
+      {/* =========================
+          INCIDENTLOCATIE
+      ========================= */}
+
       <Marker
 
         position={position}
@@ -151,14 +203,23 @@ function MapView({
 
         <Popup>
 
-          Incidentlocatie
+          <b>
+            Incidentlocatie
+          </b>
+
+          <br />
+
+          {latitude.toFixed(5)},{" "}
+          {longitude.toFixed(5)}
 
         </Popup>
 
       </Marker>
 
 
-      {/* vaste zoekcirkel 500 meter */}
+      {/* =========================
+          500 METER ZOEKCIRKEL
+      ========================= */}
 
       <Circle
 
@@ -181,7 +242,9 @@ function MapView({
       />
 
 
-      {/* ovale gasmal */}
+      {/* =========================
+          GASZONE
+      ========================= */}
 
       <RiskArea
 
@@ -198,7 +261,14 @@ function MapView({
       />
 
 
-      {/* objecten in cirkel + gasmal */}
+      {/* =========================
+          KWETSBARE OBJECTEN
+          
+          Objecten binnen:
+          - 500 meter
+          OF
+          - gaszone
+      ========================= */}
 
       <VulnerableObjects
 
@@ -207,6 +277,10 @@ function MapView({
         longitude={longitude}
 
         gasZone={gasZone}
+
+        onVisibleObjectsChange={
+          onVisibleObjectsChange
+        }
 
       />
 
