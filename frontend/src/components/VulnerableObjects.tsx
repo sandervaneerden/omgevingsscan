@@ -3,171 +3,209 @@ import { Marker, Popup } from "react-leaflet";
 import { getVulnerableObjects } from "../services/vulnerableObjectService";
 import L from "leaflet";
 
-
 interface VulnerableObject {
-
-  id:string;
-  name:string;
-  type:string;
-  latitude:number;
-  longitude:number;
-
+  id: string;
+  name: string;
+  type: string;
+  latitude: number;
+  longitude: number;
 }
-
 
 interface Props {
-
-  latitude:number;
-  longitude:number;
-  gasZone?:[number,number][];
-
+  latitude: number;
+  longitude: number;
+  gasZone?: [number, number][];
 }
 
+function distanceInMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371000;
 
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
 
-function iconForType(type:string){
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
 
-  let icon="📍";
+  const c =
+    2 * Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    );
 
-  if(type==="school")
-    icon="🏫";
+  return R * c;
+}
 
-  if(type==="hospital")
-    icon="🏥";
+function pointInGasZone(
+  latitude: number,
+  longitude: number,
+  zone: [number, number][]
+): boolean {
+  if (zone.length < 3) {
+    return false;
+  }
 
-  if(type==="church")
-    icon="⛪";
+  let inside = false;
 
-  if(type==="shop")
-    icon="🏪";
+  for (
+    let i = 0, j = zone.length - 1;
+    i < zone.length;
+    j = i++
+  ) {
+    const lat1 = zone[i][0];
+    const lon1 = zone[i][1];
 
+    const lat2 = zone[j][0];
+    const lon2 = zone[j][1];
+
+    const intersect =
+      (lon1 > longitude) !== (lon2 > longitude) &&
+      latitude <
+        ((lat2 - lat1) * (longitude - lon1)) /
+          (lon2 - lon1) +
+          lat1;
+
+    if (intersect) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+function iconForType(type: string) {
+  let icon = "📍";
+
+  if (type === "school") {
+    icon = "🏫";
+  }
+
+  if (type === "hospital") {
+    icon = "🏥";
+  }
+
+  if (type === "church") {
+    icon = "⛪";
+  }
+
+  if (type === "shop") {
+    icon = "🏪";
+  }
+
+  if (type === "community") {
+    icon = "🏢";
+  }
 
   return L.divIcon({
-
     html:
-      `<div style="font-size:24px">${icon}</div>`,
-
-    className:""
-
+      '<div style="font-size:24px">' +
+      icon +
+      "</div>",
+    className: ""
   });
-
 }
 
-
-
-
 export default function VulnerableObjects({
-
   latitude,
-
-  longitude
-
-}:Props){
-
-
-  const [objects,setObjects] = useState<VulnerableObject[]>([]);
-
-
-
-  useEffect(()=>{
-
-
-    async function load(){
-
-
-      try {
-
-
-      const result = await getVulnerableObjects(
-
-  latitude,
-
   longitude,
+  gasZone
+}: Props) {
+  const [objects, setObjects] =
+    useState<VulnerableObject[]>([]);
 
-  3000,
+  useEffect(() => {
+    async function load() {
+      try {
+        const result =
+          await getVulnerableObjects(
+            latitude,
+            longitude,
+            3000
+          );
 
-
-);
         console.log(
           "Objecten geladen:",
           result.length
         );
 
+        console.log(
+          "Overpass objecten:",
+          result
+        );
 
-        console.log("Overpass objecten:", result);
-
-setObjects(result);
-
-
-      } catch(error){
-
-
+        setObjects(result);
+      } catch (error) {
         console.error(
           "Object fout:",
           error
         );
-
-
       }
-
-
     }
-
 
     load();
+  }, [latitude, longitude]);
 
+console.log("🟢 Totaal opgehaalde objecten:", objects.length);
+console.log("🔴 Gaszone punten:", gasZone?.length ?? 0);
+console.log("🟡 Gaszone:", gasZone);
 
-  },[latitude,longitude]);
+  const visibleObjects =
+    objects.filter((obj) => {
+      const distance =
+        distanceInMeters(
+          latitude,
+          longitude,
+          obj.latitude,
+          obj.longitude
+        );
 
+      const insideCircle =
+        distance <= 500;
 
+      const insideGasZone =
+        pointInGasZone(
+          obj.latitude,
+          obj.longitude,
+          gasZone ?? []
+        );
 
+      return (
+        insideCircle ||
+        insideGasZone
+      );
+    });
 
-  return (
-
-    <>
-
-    {
-
-      objects.map(obj=>(
-
-
-        <Marker
-
-          key={obj.id}
-
-          position={[
-
-            obj.latitude,
-
-            obj.longitude
-
-          ]}
-
-          icon={iconForType(obj.type)}
-
-        >
-
-          <Popup>
-
-            <b>{obj.name}</b>
-
-            <br/>
-
-            {obj.type}
-
-          </Popup>
-
-
-        </Marker>
-
-
-      ))
-
-    }
-
-    </>
-
+  console.log(
+    "📍 Zichtbare objecten:",
+    visibleObjects.length
   );
 
-
+  return (
+    <>
+      {visibleObjects.map((obj) => (
+        <Marker
+          key={obj.id}
+          position={[
+            obj.latitude,
+            obj.longitude
+          ]}
+          icon={iconForType(obj.type)}
+        >
+          <Popup>
+            <b>{obj.name}</b>
+            <br />
+            {obj.type}
+          </Popup>
+        </Marker>
+      ))}
+    </>
+  );
 }
