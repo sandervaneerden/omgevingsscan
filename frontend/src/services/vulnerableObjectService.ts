@@ -6,9 +6,6 @@ export interface VulnerableObject {
   longitude: number;
 }
 
-const BACKEND_URL =
-  "https://opulent-sniffle-966rqwj6pp742xp49-3001.app.github.dev";
-
 export async function getVulnerableObjects(
   latitude: number,
   longitude: number,
@@ -20,7 +17,7 @@ export async function getVulnerableObjects(
   console.log("Zoekradius:", radius);
 
   const url =
-    `${BACKEND_URL}/api/vulnerable-objects` +
+    `/api/vulnerable-objects` +
     `?latitude=${latitude}` +
     `&longitude=${longitude}` +
     `&radius=${radius}`;
@@ -28,9 +25,11 @@ export async function getVulnerableObjects(
   console.log("Backend verzoek:", url);
 
   try {
+
     const response = await fetch(url);
 
     if (!response.ok) {
+
       console.error(
         "❌ Backend fout:",
         response.status,

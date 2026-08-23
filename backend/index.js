@@ -25,7 +25,7 @@ const OVERPASS_SERVERS = [
 app.get("/", (req, res) => {
   res.json({
     status: "ok",
-    message: "Omgevingsscan backend werkt"
+    message: "Omgevingsscan backend werkt",
   });
 });
 
@@ -40,23 +40,24 @@ app.get("/api/vulnerable-objects", async (req, res) => {
   const longitude = Number(req.query.longitude);
   const radius = Number(req.query.radius || 3000);
 
-
   console.log("");
   console.log("🔎 Objecten opvragen");
   console.log("Locatie:", latitude, longitude);
   console.log("Radius:", radius);
 
 
+  // ------------------------------------------------
+  // INPUT CONTROLEREN
+  // ------------------------------------------------
+
   if (
     !Number.isFinite(latitude) ||
     !Number.isFinite(longitude) ||
     !Number.isFinite(radius)
   ) {
-
     return res.status(400).json({
-      error: "Ongeldige locatie of radius"
+      error: "Ongeldige locatie of radius",
     });
-
   }
 
 
@@ -95,7 +96,6 @@ out center;
   let data = null;
   let laatsteFout = null;
 
-
   for (const server of OVERPASS_SERVERS) {
 
     try {
@@ -104,22 +104,18 @@ out center;
       console.log("🌍 Overpass proberen:");
       console.log(server);
 
+      const response = await fetch(server, {
+        method: "POST",
 
-      const response = await fetch(
-        server,
-        {
-          method: "POST",
+        headers: {
+          "Content-Type": "text/plain",
+          "User-Agent": "Omgevingsscan/1.0",
+        },
 
-          headers: {
-            "Content-Type": "text/plain",
-            "User-Agent": "Omgevingsscan/1.0"
-          },
+        body: query,
 
-          body: query,
-
-          signal: AbortSignal.timeout(40000)
-        }
-      );
+        signal: AbortSignal.timeout(40000),
+      });
 
 
       console.log(
@@ -142,25 +138,20 @@ out center;
           foutTekst.substring(0, 500)
         );
 
-
         laatsteFout =
           new Error(
             `Overpass HTTP ${response.status}`
           );
 
-
         continue;
-
       }
 
 
       data = await response.json();
 
-
       console.log(
         "✅ Overpass antwoord ontvangen"
       );
-
 
       break;
 
@@ -172,11 +163,8 @@ out center;
         error.message
       );
 
-
       laatsteFout = error;
-
     }
-
   }
 
 
@@ -190,17 +178,14 @@ out center;
       "❌ Alle Overpass servers mislukt"
     );
 
-
     return res.status(502).json({
-
       error:
         "Alle Overpass servers zijn tijdelijk niet beschikbaar",
 
       details:
-        laatsteFout?.message || "Onbekende fout"
-
+        laatsteFout?.message ||
+        "Onbekende fout",
     });
-
   }
 
 
@@ -209,14 +194,11 @@ out center;
   // ------------------------------------------------
 
   const objects = data.elements
-
     .map((el) => {
-
 
       const lat =
         el.lat ??
         el.center?.lat;
-
 
       const lon =
         el.lon ??
@@ -227,9 +209,7 @@ out center;
         typeof lat !== "number" ||
         typeof lon !== "number"
       ) {
-
         return null;
-
       }
 
 
@@ -242,43 +222,33 @@ out center;
 
         type = "school";
 
-      }
-
-      else if (
+      } else if (
         el.tags?.amenity === "hospital"
       ) {
 
         type = "hospital";
 
-      }
-
-      else if (
+      } else if (
         el.tags?.amenity === "place_of_worship"
       ) {
 
         type = "church";
 
-      }
-
-      else if (
+      } else if (
         el.tags?.shop
       ) {
 
         type = "shop";
 
-      }
-
-      else if (
+      } else if (
         el.tags?.amenity === "community_centre"
       ) {
 
         type = "community";
-
       }
 
 
       return {
-
         id: String(el.id),
 
         name:
@@ -289,12 +259,9 @@ out center;
 
         latitude: lat,
 
-        longitude: lon
-
+        longitude: lon,
       };
-
     })
-
     .filter(Boolean);
 
 
@@ -303,18 +270,20 @@ out center;
   // ------------------------------------------------
 
   const uniqueObjects = Array.from(
-
     new Map(
       objects.map(
         (object) => [
           `${object.id}-${object.type}`,
-          object
+          object,
         ]
       )
     ).values()
-
   );
 
+
+  // ------------------------------------------------
+  // LOGGEN
+  // ------------------------------------------------
 
   console.log("");
   console.log(
@@ -322,54 +291,73 @@ out center;
     uniqueObjects.length
   );
 
-
   console.log(
     "🏫 Scholen:",
     uniqueObjects.filter(
-      o => o.type === "school"
+      (o) => o.type === "school"
     ).length
   );
-
 
   console.log(
     "🏥 Ziekenhuizen:",
     uniqueObjects.filter(
-      o => o.type === "hospital"
+      (o) => o.type === "hospital"
     ).length
   );
-
 
   console.log(
     "⛪ Kerken:",
     uniqueObjects.filter(
-      o => o.type === "church"
+      (o) => o.type === "church"
     ).length
   );
-
 
   console.log(
     "🏪 Winkels:",
     uniqueObjects.filter(
-      o => o.type === "shop"
+      (o) => o.type === "shop"
     ).length
   );
-
 
   console.log(
     "🏢 Buurthuizen:",
     uniqueObjects.filter(
-      o => o.type === "community"
+      (o) => o.type === "community"
     ).length
   );
 
 
-  res.json(uniqueObjects);
+  // ------------------------------------------------
+  // ANTWOORD
+  // ------------------------------------------------
 
+  return res.json(uniqueObjects);
 });
 
 
 // --------------------------------------------------
-// SERVER STARTEN
+// LOKAAL SERVER STARTEN
+// --------------------------------------------------
+
+if (require.main === module) {
+
+  app.listen(
+    PORT,
+    "0.0.0.0",
+    () => {
+
+      console.log(
+        `Omgevingsscan backend draait op poort ${PORT}`
+      );
+
+    }
+  );
+
+}
+
+
+// --------------------------------------------------
+// VERCEL / EXPRESS EXPORT
 // --------------------------------------------------
 
 module.exports = app;
