@@ -1,6 +1,4 @@
-import { useEffect, useState } from "react";
 import { Marker, Popup } from "react-leaflet";
-import { getVulnerableObjects } from "../services/vulnerableObjectService";
 import L from "leaflet";
 
 export interface VulnerableObject {
@@ -11,25 +9,15 @@ export interface VulnerableObject {
   longitude: number;
 }
 
-interface VisibleVulnerableObject extends VulnerableObject {
-  distance: number;
-  insideCircle: boolean;
-  insideGasZone: boolean;
-}
-
 interface Props {
   latitude: number;
   longitude: number;
+  objects: VulnerableObject[];
   gasZone?: [number, number][];
   onVisibleObjectsChange?: (
-    objects: VisibleVulnerableObject[]
+    objects: VulnerableObject[]
   ) => void;
 }
-
-
-// =========================
-// AFSTAND
-// =========================
 
 function distanceInMeters(
   lat1: number,
@@ -37,7 +25,6 @@ function distanceInMeters(
   lat2: number,
   lon2: number
 ): number {
-
   const R = 6371000;
 
   const dLat =
@@ -65,11 +52,6 @@ function distanceInMeters(
 
   return R * c;
 }
-
-
-// =========================
-// PUNT IN GASZONE
-// =========================
 
 function pointInGasZone(
   latitude: number,
@@ -113,224 +95,97 @@ function pointInGasZone(
   return inside;
 }
 
-
-// =========================
-// ICOON
-// =========================
-
 function iconForType(type: string) {
 
   let icon = "📍";
 
-  if (type === "school") {
-    icon = "🏫";
-  }
+  switch (type) {
 
-  if (type === "hospital") {
-    icon = "🏥";
-  }
+    case "school":
+      icon = "🏫";
+      break;
 
-  if (type === "church") {
-    icon = "⛪";
-  }
+    case "hospital":
+      icon = "🏥";
+      break;
 
-  if (type === "shop") {
-    icon = "🏪";
-  }
+    case "church":
+      icon = "⛪";
+      break;
 
-  if (type === "community") {
-    icon = "🏢";
+    case "shop":
+      icon = "🏪";
+      break;
+
+    case "community":
+      icon = "🏢";
+      break;
+
+    default:
+      icon = "📍";
   }
 
   return L.divIcon({
-
     html:
-      '<div style="font-size:24px">' +
-      icon +
-      "</div>",
-
+      `<div style="font-size:24px">${icon}</div>`,
     className: ""
-
   });
 }
 
-
-// =========================
-// COMPONENT
-// =========================
-
 export default function VulnerableObjects({
-
   latitude,
-
   longitude,
-
+  objects,
   gasZone,
-
   onVisibleObjectsChange
-
 }: Props) {
 
+  const visibleObjects = objects.filter((obj) => {
 
-  const [objects, setObjects] =
-    useState<VulnerableObject[]>([]);
+    const distance =
+      distanceInMeters(
+        latitude,
+        longitude,
+        obj.latitude,
+        obj.longitude
+      );
 
+    const insideCircle =
+      distance <= 500;
 
-  // =========================
-  // OBJECTEN OPHALEN
-  // =========================
+    const insideGasZone =
+      pointInGasZone(
+        obj.latitude,
+        obj.longitude,
+        gasZone ?? []
+      );
 
-  useEffect(() => {
-
-    async function load() {
-
-      try {
-
-        console.log(
-          "🔎 Kwetsbare objecten ophalen..."
-        );
-
-        const result =
-          await getVulnerableObjects(
-            latitude,
-            longitude,
-            3000
-          );
-
-        console.log(
-          "🟢 Objecten opgehaald:",
-          result.length
-        );
-
-        setObjects(result);
-
-      } catch (error) {
-
-        console.error(
-          "❌ Object fout:",
-          error
-        );
-
-        setObjects([]);
-
-      }
-
-    }
-
-    load();
-
-  }, [latitude, longitude]);
-
-
-  // =========================
-  // ZICHTBARE OBJECTEN
-  // =========================
-
-  const visibleObjects: VisibleVulnerableObject[] =
-    objects
-
-      .map((obj) => {
-
-        const distance =
-          distanceInMeters(
-            latitude,
-            longitude,
-            obj.latitude,
-            obj.longitude
-          );
-
-        const insideCircle =
-          distance <= 500;
-
-        const insideGasZone =
-          pointInGasZone(
-            obj.latitude,
-            obj.longitude,
-            gasZone ?? []
-          );
-
-        return {
-
-          ...obj,
-
-          distance,
-
-          insideCircle,
-
-          insideGasZone
-
-        };
-
-      })
-
-      .filter((obj) => {
-
-        return (
-          obj.insideCircle ||
-          obj.insideGasZone
-        );
-
-      })
-
-      .sort((a, b) => {
-
-        return a.distance - b.distance;
-
-      });
-
-
-  // =========================
-  // OBJECTEN DOORGEVEN AAN APP
-  // =========================
-
-  useEffect(() => {
-
-    console.log(
-      "📍 Zichtbare objecten:",
-      visibleObjects.length
+    return (
+      insideCircle ||
+      insideGasZone
     );
+  });
 
-    console.log(
-      "🔴 Gaszone punten:",
-      gasZone?.length ?? 0
-    );
+  console.log(
+    "📍 Objecten zichtbaar op kaart:",
+    visibleObjects.length
+  );
 
-    onVisibleObjectsChange?.(
-      visibleObjects
-    );
-
-  }, [
-    objects,
-    gasZone,
-    latitude,
-    longitude,
-    onVisibleObjectsChange
-  ]);
-
-
-  // =========================
-  // KAARTMARKERS
-  // =========================
+  onVisibleObjectsChange?.(
+    visibleObjects
+  );
 
   return (
-
     <>
-
       {visibleObjects.map((obj) => (
 
         <Marker
-
           key={obj.id}
-
           position={[
             obj.latitude,
             obj.longitude
           ]}
-
-          icon={
-            iconForType(obj.type)
-          }
-
+          icon={iconForType(obj.type)}
         >
 
           <Popup>
@@ -343,41 +198,11 @@ export default function VulnerableObjects({
 
             {obj.type}
 
-            <br />
-
-            <br />
-
-            Afstand:{" "}
-
-            {obj.distance < 1000
-
-              ? `${Math.round(
-                  obj.distance
-                )} meter`
-
-              : `${(
-                  obj.distance / 1000
-                ).toFixed(1)} km`
-
-            }
-
-            {obj.insideGasZone &&
-              !obj.insideCircle && (
-
-              <>
-                <br />
-                <b>⚠️ Binnen gaszone</b>
-              </>
-
-            )}
-
           </Popup>
 
         </Marker>
 
       ))}
-
     </>
-
   );
 }

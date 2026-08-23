@@ -10,20 +10,27 @@ import "leaflet/dist/leaflet.css";
 
 import L from "leaflet";
 
-import { useState } from "react";
+import {
+  useEffect,
+  useState
+} from "react";
 
 import RiskArea from "./RiskArea";
 import MapUpdater from "./MapUpdater";
 import VulnerableObjects from "./VulnerableObjects";
+
+import {
+  getVulnerableObjects
+} from "../services/vulnerableObjectService";
 
 import type {
   VulnerableObject
 } from "../services/vulnerableObjectService";
 
 
-// ======================================================
-// LEAFLET MARKER CORRECT LADEN IN VITE
-// ======================================================
+// =====================================================
+// LEAFLET MARKER
+// =====================================================
 
 delete (
   L.Icon.Default.prototype as any
@@ -43,9 +50,9 @@ L.Icon.Default.mergeOptions({
 });
 
 
-// ======================================================
+// =====================================================
 // PROPS
-// ======================================================
+// =====================================================
 
 interface MapViewProps {
 
@@ -57,18 +64,20 @@ interface MapViewProps {
 
   windSpeed: number;
 
-  objects: VulnerableObject[];
+  onVisibleObjectsChange?: (
+    objects: VulnerableObject[]
+  ) => void;
 
-  onGasZoneChange: (
-    zone: [number, number][]
+  onObjectsLoadingChange?: (
+    loading: boolean
   ) => void;
 
 }
 
 
-// ======================================================
-// MAPVIEW
-// ======================================================
+// =====================================================
+// COMPONENT
+// =====================================================
 
 function MapView({
 
@@ -80,71 +89,165 @@ function MapView({
 
   windSpeed,
 
-  objects,
+  onVisibleObjectsChange,
 
-  onGasZoneChange
+  onObjectsLoadingChange
 
 }: MapViewProps) {
 
 
-  // ====================================================
-  // INCIDENTLOCATIE
-  // ====================================================
+  // ===================================================
+  // POSITIE
+  // ===================================================
 
   const position: [number, number] = [
-
     latitude,
-
     longitude
-
   ];
 
 
-  // ====================================================
+  // ===================================================
   // GASZONE
-  // ====================================================
+  // ===================================================
 
-  const [gasZone, setGasZone] =
-    useState<[number, number][]>([]);
+  const [
+    gasZone,
+    setGasZone
+  ] = useState<[number, number][]>([]);
 
 
-  // ====================================================
+  // ===================================================
+  // OBJECTEN
+  // ===================================================
+
+  const [
+    objects,
+    setObjects
+  ] = useState<VulnerableObject[]>([]);
+
+
+  const [
+    objectsLoading,
+    setObjectsLoading
+  ] = useState(true);
+
+
+  // ===================================================
+  // OBJECTEN OPHALEN
+  // ===================================================
+
+  useEffect(() => {
+
+    let cancelled = false;
+
+
+    async function loadObjects() {
+
+      console.log(
+        "🔎 Objecten ophalen voor:",
+        latitude,
+        longitude
+      );
+
+      setObjectsLoading(true);
+
+      onObjectsLoadingChange?.(true);
+
+      try {
+
+        const result =
+          await getVulnerableObjects(
+            latitude,
+            longitude,
+            1000
+          );
+
+
+        if (cancelled) {
+          return;
+        }
+
+
+        console.log(
+          "✅ Objecten ontvangen:",
+          result.length
+        );
+
+
+        setObjects(result);
+
+      } catch (error) {
+
+        console.error(
+          "❌ Fout bij ophalen objecten:",
+          error
+        );
+
+
+        if (!cancelled) {
+          setObjects([]);
+        }
+
+      } finally {
+
+        if (!cancelled) {
+
+          setObjectsLoading(false);
+
+          onObjectsLoadingChange?.(
+            false
+          );
+
+        }
+
+      }
+
+    }
+
+
+    loadObjects();
+
+
+    return () => {
+
+      cancelled = true;
+
+    };
+
+  }, [
+    latitude,
+    longitude,
+    onObjectsLoadingChange
+  ]);
+
+
+  // ===================================================
   // WINDRICHTING
-  //
-  // windDirection = richting waar de wind vandaan komt
-  //
-  // Gas verspreidt zich met de wind mee.
-  // Daarom 180 graden draaien.
-  // ====================================================
+  // ===================================================
+
+  // Wind komt UIT deze richting.
+  // Gas verspreidt zich MET de wind mee.
 
   const dispersionDirection =
     (windDirection + 180) % 360;
 
 
-  // ====================================================
-  // GASZONE BIJWERKEN
-  // ====================================================
+  // ===================================================
+  // LOADING STATUS
+  // ===================================================
 
-  function handleGasZoneCreated(
-    zone: [number, number][]
-  ) {
+  if (objectsLoading) {
 
     console.log(
-      "🔴 Nieuwe gaszone ontvangen:",
-      zone.length,
-      "punten"
+      "⏳ Kwetsbare objecten worden geladen..."
     );
-
-    setGasZone(zone);
-
-    onGasZoneChange(zone);
 
   }
 
 
-  // ====================================================
+  // ===================================================
   // RENDER
-  // ====================================================
+  // ===================================================
 
   return (
 
@@ -155,19 +258,16 @@ function MapView({
       zoom={15}
 
       style={{
-
         height: "600px",
-
         width: "100%"
-
       }}
 
     >
 
 
-      {/* ================================================
-          KAART AUTOMATISCH NAAR NIEUWE LOCATIE
-          ================================================ */}
+      {/* =============================================
+          KAART NAAR NIEUWE LOCATIE
+      ============================================= */}
 
       <MapUpdater
 
@@ -178,9 +278,9 @@ function MapView({
       />
 
 
-      {/* ================================================
+      {/* =============================================
           OPENSTREETMAP
-          ================================================ */}
+      ============================================= */}
 
       <TileLayer
 
@@ -191,34 +291,26 @@ function MapView({
       />
 
 
-      {/* ================================================
+      {/* =============================================
           INCIDENTLOCATIE
-          ================================================ */}
+      ============================================= */}
 
       <Marker
-
         position={position}
-
       >
 
         <Popup>
 
-          <b>Incidentlocatie</b>
-
-          <br />
-
-          {latitude.toFixed(5)},
-          {" "}
-          {longitude.toFixed(5)}
+          Incidentlocatie
 
         </Popup>
 
       </Marker>
 
 
-      {/* ================================================
-          VASTE ZOEKCIRKEL VAN 500 METER
-          ================================================ */}
+      {/* =============================================
+          ZOEKCIRKEL 500 METER
+      ============================================= */}
 
       <Circle
 
@@ -241,9 +333,9 @@ function MapView({
       />
 
 
-      {/* ================================================
+      {/* =============================================
           GASZONE
-          ================================================ */}
+      ============================================= */}
 
       <RiskArea
 
@@ -251,29 +343,22 @@ function MapView({
 
         longitude={longitude}
 
-        windDirection={dispersionDirection}
+        windDirection={
+          dispersionDirection
+        }
 
         windSpeed={windSpeed}
 
         onZoneCreated={
-          handleGasZoneCreated
+          setGasZone
         }
 
       />
 
 
-      {/* ================================================
+      {/* =============================================
           KWETSBARE OBJECTEN
-          
-          BELANGRIJK:
-          Deze component doet GEEN API-call.
-
-          De objecten zijn al door App.tsx opgehaald
-          met een zoekradius van 1000 meter.
-
-          Hierdoor gebruiken kaart en lijst dezelfde
-          dataset.
-          ================================================ */}
+      ============================================= */}
 
       <VulnerableObjects
 
@@ -281,12 +366,15 @@ function MapView({
 
         longitude={longitude}
 
-        gasZone={gasZone}
-
         objects={objects}
 
-      />
+        gasZone={gasZone}
 
+        onVisibleObjectsChange={
+          onVisibleObjectsChange
+        }
+
+      />
 
     </MapContainer>
 
