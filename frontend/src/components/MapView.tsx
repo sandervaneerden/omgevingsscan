@@ -21,7 +21,6 @@ import VulnerableObjects from "./VulnerableObjects";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 
-
 L.Icon.Default.mergeOptions({
 
   iconRetinaUrl:
@@ -36,8 +35,6 @@ L.Icon.Default.mergeOptions({
 });
 
 
-
-
 interface MapViewProps {
 
   latitude: number;
@@ -48,10 +45,11 @@ interface MapViewProps {
 
   windSpeed: number;
 
+  onGasZoneCreated?: (
+    zone: [number, number][]
+  ) => void;
+
 }
-
-
-
 
 
 function MapView({
@@ -62,10 +60,11 @@ function MapView({
 
   windDirection,
 
-  windSpeed
+  windSpeed,
+
+  onGasZoneCreated
 
 }: MapViewProps) {
-
 
 
   const position: [number, number] = [
@@ -77,14 +76,11 @@ function MapView({
   ];
 
 
-
-
   const [gasZone, setGasZone] = useState<
 
     [number, number][]
 
   >([]);
-
 
 
   // Wind komt uit deze richting.
@@ -95,7 +91,19 @@ function MapView({
     (windDirection + 180) % 360;
 
 
+  function handleZoneCreated(
+    zone: [number, number][]
+  ) {
 
+    setGasZone(zone);
+
+    if (onGasZoneCreated) {
+
+      onGasZoneCreated(zone);
+
+    }
+
+  }
 
 
   return (
@@ -117,7 +125,6 @@ function MapView({
     >
 
 
-
       <MapUpdater
 
         latitude={latitude}
@@ -127,9 +134,6 @@ function MapView({
       />
 
 
-
-
-
       <TileLayer
 
         attribution="&copy; OpenStreetMap contributors"
@@ -137,9 +141,6 @@ function MapView({
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 
       />
-
-
-
 
 
       <Marker
@@ -157,9 +158,6 @@ function MapView({
       </Marker>
 
 
-
-
-
       {/* vaste zoekcirkel 500 meter */}
 
       <Circle
@@ -170,20 +168,17 @@ function MapView({
 
         pathOptions={{
 
-          color:"blue",
+          color: "blue",
 
-          fillColor:"blue",
+          fillColor: "blue",
 
-          fillOpacity:0.05,
+          fillOpacity: 0.05,
 
-          weight:2
+          weight: 2
 
         }}
 
       />
-
-
-
 
 
       {/* ovale gasmal */}
@@ -198,12 +193,9 @@ function MapView({
 
         windSpeed={windSpeed}
 
-        onZoneCreated={setGasZone}
+        onZoneCreated={handleZoneCreated}
 
       />
-
-
-
 
 
       {/* objecten in cirkel + gasmal */}
@@ -219,15 +211,11 @@ function MapView({
       />
 
 
-
-
-
     </MapContainer>
 
   );
 
 }
-
 
 
 export default MapView;

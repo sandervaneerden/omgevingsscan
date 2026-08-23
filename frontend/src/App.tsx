@@ -29,12 +29,126 @@ function App() {
   const [objectsLoading, setObjectsLoading] =
     useState(false);
 
+  const [gasZone, setGasZone] =
+    useState<[number, number][]>([]);
 
-  /*
-   * ==========================================
-   * AFSTAND BEREKENEN
-   * ==========================================
-   */
+
+  async function handleLocationFound(locationData: {
+    address: string;
+    latitude: number;
+    longitude: number;
+  }) {
+
+    setLocation(locationData);
+
+    // Nieuwe locatie = nieuwe gaszone
+    setGasZone([]);
+
+
+    // =========================
+    // METEO OPHALEN
+    // =========================
+
+    try {
+
+      const weatherData =
+        await getWeather(
+          locationData.latitude,
+          locationData.longitude
+        );
+
+      setWeather(weatherData);
+
+    } catch (error) {
+
+      console.error(
+        "Fout bij ophalen weer:",
+        error
+      );
+
+      setWeather(null);
+    }
+
+
+    // =========================
+    // KWETSBARE OBJECTEN
+    // =========================
+
+    setObjectsLoading(true);
+
+    try {
+
+      const objectData =
+        await getVulnerableObjects(
+          locationData.latitude,
+          locationData.longitude,
+          3000
+        );
+
+      setObjects(objectData);
+
+    } catch (error) {
+
+      console.error(
+        "Fout bij ophalen kwetsbare objecten:",
+        error
+      );
+
+      setObjects([]);
+
+    } finally {
+
+      setObjectsLoading(false);
+
+    }
+  }
+
+
+  // =========================
+  // OBJECTEN INITIEEL OPHALEN
+  // =========================
+
+  useEffect(() => {
+
+    async function loadInitialObjects() {
+
+      setObjectsLoading(true);
+
+      try {
+
+        const result =
+          await getVulnerableObjects(
+            location.latitude,
+            location.longitude,
+            3000
+          );
+
+        setObjects(result);
+
+      } catch (error) {
+
+        console.error(
+          "Fout bij laden objecten:",
+          error
+        );
+
+        setObjects([]);
+
+      } finally {
+
+        setObjectsLoading(false);
+
+      }
+    }
+
+    loadInitialObjects();
+
+  }, []);
+
+
+  // =========================
+  // AFSTAND BEREKENEN
+  // =========================
 
   function distanceInMeters(
     lat1: number,
@@ -72,168 +186,60 @@ function App() {
   }
 
 
-  /*
-   * ==========================================
-   * LOCATIE GEVONDEN
-   * ==========================================
-   */
+  // =========================
+  // PUNT IN GASZONE
+  // =========================
 
-  async function handleLocationFound(
-    locationData: {
-      address: string;
-      latitude: number;
-      longitude: number;
-    }
-  ) {
+  function pointInGasZone(
+    latitude: number,
+    longitude: number,
+    zone: [number, number][]
+  ): boolean {
 
-    console.log(
-      "📍 Nieuwe incidentlocatie:",
-      locationData
-    );
-
-    setLocation(locationData);
-
-
-    /*
-     * ========================================
-     * METEO OPHALEN
-     * ========================================
-     */
-
-    try {
-
-      const weatherData =
-        await getWeather(
-          locationData.latitude,
-          locationData.longitude
-        );
-
-      console.log(
-        "🌤️ Meteo ontvangen:",
-        weatherData
-      );
-
-      setWeather(weatherData);
-
-    } catch (error) {
-
-      console.error(
-        "❌ Fout bij ophalen weer:",
-        error
-      );
-
-      setWeather(null);
+    if (zone.length < 3) {
+      return false;
     }
 
+    let inside = false;
 
-    /*
-     * ========================================
-     * KWETSBARE OBJECTEN OPHALEN
-     * ========================================
-     */
+    for (
+      let i = 0, j = zone.length - 1;
+      i < zone.length;
+      j = i++
+    ) {
 
-    setObjectsLoading(true);
+      const lat1 = zone[i][0];
+      const lon1 = zone[i][1];
 
-    try {
+      const lat2 = zone[j][0];
+      const lon2 = zone[j][1];
 
-      const objectData =
-        await getVulnerableObjects(
-          locationData.latitude,
-          locationData.longitude,
-          3000
-        );
+      const intersect =
+        (lon1 > longitude) !==
+          (lon2 > longitude) &&
 
-      console.log(
-        "🏢 Kwetsbare objecten ontvangen:",
-        objectData.length
-      );
+        latitude <
+          ((lat2 - lat1) *
+            (longitude - lon1)) /
+            (lon2 - lon1) +
+            lat1;
 
-      console.log(
-        "📋 Objecten:",
-        objectData
-      );
-
-      setObjects(objectData);
-
-    } catch (error) {
-
-      console.error(
-        "❌ Fout bij ophalen kwetsbare objecten:",
-        error
-      );
-
-      setObjects([]);
-
-    } finally {
-
-      setObjectsLoading(false);
-
-    }
-  }
-
-
-  /*
-   * ==========================================
-   * OBJECTEN VOOR STARTLOCATIE
-   * ==========================================
-   */
-
-  useEffect(() => {
-
-    async function loadInitialObjects() {
-
-      setObjectsLoading(true);
-
-      try {
-
-        const result =
-          await getVulnerableObjects(
-            location.latitude,
-            location.longitude,
-            3000
-          );
-
-        console.log(
-          "🏢 Initiële objecten:",
-          result.length
-        );
-
-        setObjects(result);
-
-      } catch (error) {
-
-        console.error(
-          "❌ Fout bij laden objecten:",
-          error
-        );
-
-        setObjects([]);
-
-      } finally {
-
-        setObjectsLoading(false);
-
+      if (intersect) {
+        inside = !inside;
       }
     }
 
-    loadInitialObjects();
+    return inside;
+  }
 
-  }, []);
 
-
-  /*
-   * ==========================================
-   * OBJECTEN VOOR DE LIJST
-   *
-   * We gebruiken hier dezelfde objecten die
-   * door de backend zijn opgehaald.
-   *
-   * De backend zoekt binnen 3000 meter.
-   * ==========================================
-   */
+  // =========================
+  // ZICHTBARE OBJECTEN
+  // =========================
 
   const visibleObjects =
     objects
+
       .map((obj) => {
 
         const distance =
@@ -244,23 +250,40 @@ function App() {
             obj.longitude
           );
 
+        const insideCircle =
+          distance <= 500;
+
+        const insideGasZone =
+          pointInGasZone(
+            obj.latitude,
+            obj.longitude,
+            gasZone
+          );
+
         return {
           ...obj,
-          distance
+          distance,
+          insideCircle,
+          insideGasZone
         };
 
       })
+
+      .filter(
+        (obj) =>
+          obj.insideCircle ||
+          obj.insideGasZone
+      )
+
       .sort(
         (a, b) =>
           a.distance - b.distance
       );
 
 
-  /*
-   * ==========================================
-   * ICOON PER TYPE
-   * ==========================================
-   */
+  // =========================
+  // ICOON BEPALEN
+  // =========================
 
   function iconForType(type: string) {
 
@@ -287,20 +310,14 @@ function App() {
   }
 
 
-  /*
-   * ==========================================
-   * RENDER
-   * ==========================================
-   */
-
   return (
 
     <div className="app">
 
 
-      {/* =====================================
+      {/* =========================
           HEADER
-      ===================================== */}
+      ========================= */}
 
       <header className="header">
 
@@ -319,9 +336,9 @@ function App() {
       </header>
 
 
-      {/* =====================================
+      {/* =========================
           ZOEKEN
-      ===================================== */}
+      ========================= */}
 
       <section className="search-panel">
 
@@ -338,16 +355,16 @@ function App() {
       </section>
 
 
-      {/* =====================================
+      {/* =========================
           DASHBOARD
-      ===================================== */}
+      ========================= */}
 
       <main className="dashboard">
 
 
-        {/* ===================================
+        {/* =========================
             METEO
-        =================================== */}
+        ========================= */}
 
         <section className="panel weather-panel">
 
@@ -362,9 +379,9 @@ function App() {
         </section>
 
 
-        {/* ===================================
+        {/* =========================
             KWETSBARE OBJECTEN
-        =================================== */}
+        ========================= */}
 
         <section className="panel objects-panel">
 
@@ -386,8 +403,6 @@ function App() {
           </div>
 
 
-          {/* LADEN */}
-
           {objectsLoading ? (
 
             <div className="objects-loading">
@@ -396,11 +411,7 @@ function App() {
 
             </div>
 
-
           ) : visibleObjects.length === 0 ? (
-
-
-            /* GEEN OBJECTEN */
 
             <div className="objects-empty">
 
@@ -409,16 +420,15 @@ function App() {
               </div>
 
               <div>
-                Geen kwetsbare objecten gevonden.
+
+                Geen kwetsbare objecten binnen
+                500 meter of de gaszone gevonden.
+
               </div>
 
             </div>
 
-
           ) : (
-
-
-            /* OBJECTENLIJST */
 
             <div className="objects-list">
 
@@ -429,12 +439,17 @@ function App() {
                   key={obj.id}
                 >
 
+
+                  {/* ICOON */}
+
                   <div className="object-icon">
 
                     {iconForType(obj.type)}
 
                   </div>
 
+
+                  {/* GEGEVENS */}
 
                   <div className="object-details">
 
@@ -453,6 +468,8 @@ function App() {
                   </div>
 
 
+                  {/* AFSTAND */}
+
                   <div className="object-distance">
 
                     {obj.distance < 1000
@@ -469,6 +486,21 @@ function App() {
 
                   </div>
 
+
+                  {/* GASZONE INDICATIE */}
+
+                  {obj.insideGasZone &&
+                    !obj.insideCircle && (
+
+                    <div
+                      className="object-gaszone"
+                      title="Object ligt in de gaszone"
+                    >
+                      GAS
+                    </div>
+
+                  )}
+
                 </div>
 
               ))}
@@ -480,9 +512,9 @@ function App() {
         </section>
 
 
-        {/* ===================================
+        {/* =========================
             KAART
-        =================================== */}
+        ========================= */}
 
         <section className="panel map-panel">
 
@@ -506,6 +538,10 @@ function App() {
 
             windSpeed={
               weather?.windSpeed ?? 0
+            }
+
+            onGasZoneCreated={
+              setGasZone
             }
 
           />
