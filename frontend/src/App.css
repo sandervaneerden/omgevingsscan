@@ -1,18 +1,370 @@
+/* =========================
+   BASIS
+========================= */
+
+.app {
+  min-height: 100vh;
+  background: #101820;
+  color: #e8edf2;
+}
+
+
+/* =========================
+   HEADER
+========================= */
+
 .header {
-  background: #0b2d4d;
+  background: #08131f;
   color: white;
-  padding: 30px;
+  padding: 18px 30px;
+
+  border-bottom: 1px solid #263746;
+}
+
+.header-content {
+  max-width: 1600px;
+  margin: 0 auto;
+
   display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 
 .header h1 {
-  margin: 0 0 8px 0;
-  font-size: 32px;
+  margin: 0;
+
+  font-size: 28px;
+  font-weight: 700;
+
+  letter-spacing: 0.3px;
 }
 
 .header p {
+  margin: 4px 0 0;
+
+  color: #9eacb8;
+
+  font-size: 14px;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  padding: 7px 12px;
+
+  background: #101f2c;
+
+  border: 1px solid #304454;
+
+  border-radius: 6px;
+
+  font-size: 13px;
+
+  color: #c8d2db;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+
+  border-radius: 50%;
+
+  background: #35c759;
+
+  box-shadow: 0 0 8px rgba(53, 199, 89, 0.5);
+}
+
+
+/* =========================
+   DASHBOARD
+========================= */
+
+.dashboard {
+  width: 100%;
+  max-width: 1600px;
+
+  margin: 0 auto;
+
+  padding: 20px;
+}
+
+
+/* =========================
+   ZOEKPANEEL
+========================= */
+
+.search-panel {
+  background: #172532;
+
+  border: 1px solid #293c4b;
+
+  border-radius: 8px;
+
+  padding: 18px 20px;
+
+  margin-bottom: 20px;
+
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  margin-bottom: 12px;
+}
+
+.section-title > span {
+  font-size: 24px;
+}
+
+.section-title h2 {
   margin: 0;
-  font-size: 16px;
-  opacity: 0.9;
+
+  font-size: 18px;
+
+  color: #f1f4f6;
+}
+
+.section-title p {
+  margin: 2px 0 0;
+
+  color: #91a0ad;
+
+  font-size: 13px;
+}
+
+
+/* =========================
+   HOOFDGEDEELTE
+========================= */
+
+.main-grid {
+  display: grid;
+
+  grid-template-columns: 280px minmax(0, 1fr);
+
+  gap: 20px;
+
+  align-items: start;
+}
+
+
+/* =========================
+   PANELEN
+========================= */
+
+.weather-panel,
+.map-panel,
+.object-info {
+  background: #172532;
+
+  border: 1px solid #293c4b;
+
+  border-radius: 8px;
+
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+
+  overflow: hidden;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  padding: 14px 18px;
+
+  background: #14212d;
+
+  border-bottom: 1px solid #293c4b;
+}
+
+.panel-title span {
+  font-size: 20px;
+}
+
+.panel-title h2 {
+  margin: 0;
+
+  font-size: 17px;
+
+  color: #edf2f5;
+}
+
+
+/* =========================
+   KAART
+========================= */
+
+.map-container {
+  width: 100%;
+}
+
+.map-container .leaflet-container {
+  height: 600px !important;
+  width: 100%;
+}
+
+
+/* =========================
+   OBJECTEN
+========================= */
+
+.object-info {
+  margin-top: 20px;
+
+  padding: 16px 20px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 20px;
+}
+
+.object-info-title {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+}
+
+.object-info-title > span {
+  font-size: 25px;
+}
+
+.object-info-title h2 {
+  margin: 0;
+
+  font-size: 17px;
+
+  color: #f1f4f6;
+}
+
+.object-info-title p {
+  margin: 2px 0 0;
+
+  font-size: 13px;
+
+  color: #91a0ad;
+}
+
+
+/* =========================
+   LEGENDA
+========================= */
+
+.object-legend {
+  display: flex;
+
+  align-items: center;
+
+  gap: 20px;
+
+  font-size: 13px;
+
+  color: #aebbc6;
+}
+
+.object-legend > div {
+  display: flex;
+
+  align-items: center;
+
+  gap: 7px;
+}
+
+.legend-icon {
+  display: inline-block;
+
+  width: 12px;
+  height: 12px;
+
+  border-radius: 50%;
+}
+
+.legend-icon.blue {
+  background: #3388ff;
+
+  box-shadow: 0 0 6px rgba(51, 136, 255, 0.5);
+}
+
+.legend-icon.red {
+  background: #e63946;
+
+  box-shadow: 0 0 7px rgba(230, 57, 70, 0.5);
+}
+
+.legend-icon.object {
+  background: #f1f1f1;
+}
+
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 900px) {
+
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .weather-panel {
+    order: 2;
+  }
+
+  .map-panel {
+    order: 1;
+  }
+
+  .map-container .leaflet-container {
+    height: 500px !important;
+  }
+
+  .object-info {
+    flex-direction: column;
+
+    align-items: flex-start;
+  }
+
+  .object-legend {
+    flex-wrap: wrap;
+  }
+}
+
+
+@media (max-width: 600px) {
+
+  .header {
+    padding: 16px;
+  }
+
+  .header-content {
+    align-items: flex-start;
+
+    gap: 12px;
+  }
+
+  .header-status {
+    display: none;
+  }
+
+  .dashboard {
+    padding: 12px;
+  }
+
+  .map-container .leaflet-container {
+    height: 450px !important;
+  }
 }
