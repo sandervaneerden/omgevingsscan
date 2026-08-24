@@ -184,6 +184,45 @@ function App() {
 
 
   // ============================================
+  // AFSTAND
+  // ============================================
+
+  function distanceInMeters(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ) {
+
+    const R = 6371000;
+
+    const dLat =
+      (lat2 - lat1) * Math.PI / 180;
+
+    const dLon =
+      (lon2 - lon1) * Math.PI / 180;
+
+    const a =
+      Math.sin(dLat / 2) *
+        Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+
+    const c =
+      2 *
+      Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a)
+      );
+
+    return R * c;
+
+  }
+
+
+  // ============================================
   // ICOON
   // ============================================
 
@@ -214,6 +253,122 @@ function App() {
     }
 
   }
+
+
+  // ============================================
+  // CATEGORIE
+  // ============================================
+
+  function categoryForType(
+    type: string
+  ) {
+
+    switch (type) {
+
+      case "hospital":
+        return "Zorg";
+
+      case "school":
+        return "Onderwijs";
+
+      case "church":
+        return "Religie";
+
+      case "shop":
+        return "Winkels";
+
+      case "community":
+        return "Maatschappelijk";
+
+      default:
+        return "Overig";
+
+    }
+
+  }
+
+
+  // ============================================
+  // CATEGORIE ICOON
+  // ============================================
+
+  function categoryIcon(
+    category: string
+  ) {
+
+    switch (category) {
+
+      case "Zorg":
+        return "🏥";
+
+      case "Onderwijs":
+        return "🏫";
+
+      case "Religie":
+        return "⛪";
+
+      case "Winkels":
+        return "🏪";
+
+      case "Maatschappelijk":
+        return "🏢";
+
+      default:
+        return "📍";
+
+    }
+
+  }
+
+
+  // ============================================
+  // OBJECTEN CATEGORISEREN
+  // ============================================
+
+  const groupedObjects =
+    objects.reduce(
+      (
+        groups,
+        object
+      ) => {
+
+        const category =
+          categoryForType(
+            object.type
+          );
+
+        if (!groups[category]) {
+
+          groups[category] = [];
+
+        }
+
+        groups[category].push(
+          object
+        );
+
+        return groups;
+
+      },
+      {} as Record<
+        string,
+        VulnerableObject[]
+      >
+    );
+
+
+  // ============================================
+  // CATEGORIE VOLGORDE
+  // ============================================
+
+  const categoryOrder = [
+    "Zorg",
+    "Onderwijs",
+    "Religie",
+    "Winkels",
+    "Maatschappelijk",
+    "Overig"
+  ];
 
 
   // ============================================
@@ -329,38 +484,159 @@ function App() {
 
             <div className="objects-list">
 
-              {objects.map(
-                (obj) => (
+              {categoryOrder.map(
+                (category) => {
 
-                  <div
-                    className="object-row"
-                    key={obj.id}
-                  >
+                  const categoryObjects =
+                    groupedObjects[category];
 
-                    <div className="object-icon">
+                  if (
+                    !categoryObjects ||
+                    categoryObjects.length === 0
+                  ) {
 
-                      {iconForType(
-                        obj.type
-                      )}
+                    return null;
+
+                  }
+
+
+                  const sortedObjects =
+                    [...categoryObjects].sort(
+                      (a, b) => {
+
+                        const distanceA =
+                          distanceInMeters(
+                            location.latitude,
+                            location.longitude,
+                            a.latitude,
+                            a.longitude
+                          );
+
+                        const distanceB =
+                          distanceInMeters(
+                            location.latitude,
+                            location.longitude,
+                            b.latitude,
+                            b.longitude
+                          );
+
+                        return (
+                          distanceA -
+                          distanceB
+                        );
+
+                      }
+                    );
+
+
+                  return (
+
+                    <div
+                      className="object-category"
+                      key={category}
+                    >
+
+
+                      {/* CATEGORIE HEADER */}
+
+                      <div className="object-category-title">
+
+                        <span className="object-category-icon">
+
+                          {categoryIcon(
+                            category
+                          )}
+
+                        </span>
+
+                        <span className="object-category-name">
+
+                          {category}
+
+                        </span>
+
+                        <span className="object-category-count">
+
+                          {sortedObjects.length}
+
+                        </span>
+
+                      </div>
+
+
+                      {/* OBJECTEN */}
+
+                      <div className="object-category-list">
+
+                        {sortedObjects.map(
+                          (obj) => {
+
+                            const distance =
+                              distanceInMeters(
+                                location.latitude,
+                                location.longitude,
+                                obj.latitude,
+                                obj.longitude
+                              );
+
+
+                            return (
+
+                              <div
+                                className="object-row"
+                                key={obj.id}
+                              >
+
+
+                                <div className="object-icon">
+
+                                  {iconForType(
+                                    obj.type
+                                  )}
+
+                                </div>
+
+
+                                <div className="object-details">
+
+                                  <div className="object-name">
+
+                                    {obj.name}
+
+                                  </div>
+
+                                  <div className="object-type">
+
+                                    {obj.type}
+
+                                  </div>
+
+                                </div>
+
+
+                                <div className="object-distance">
+
+                                  {Math.round(
+                                    distance
+                                  )} m
+
+                                </div>
+
+
+                              </div>
+
+                            );
+
+                          }
+                        )}
+
+                      </div>
 
                     </div>
 
+                  );
 
-                    <div className="object-details">
-
-                      <div className="object-name">
-                        {obj.name}
-                      </div>
-
-                      <div className="object-type">
-                        {obj.type}
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                )
+                }
               )}
 
             </div>
