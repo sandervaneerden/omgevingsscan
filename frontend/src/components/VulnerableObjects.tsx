@@ -137,7 +137,7 @@ export default function VulnerableObjects({
         );
 
       const insideCircle =
-        distance <= 1000;
+        distance <= 500;
 
       const insideGasZone =
         pointInGasZone(
