@@ -498,13 +498,11 @@
 
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
-  background: #151e27;
-
-  color: #ffffff;
+  color: #061009;
 }
 
 .leaflet-popup-content {
-  color: #ffffff;
+  color: #061009;
 }
 
 
