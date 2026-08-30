@@ -6,83 +6,61 @@ import SearchBar from "./components/SearchBar";
 import WeatherPanel from "./components/WeatherPanel";
 import MapView from "./components/MapView";
 
-import {
-  getWeather
-} from "./services/weatherService";
+import { getWeather } from "./services/weatherService";
+
+import type { WeatherResult } from "./services/weatherService";
+
+import { getVulnerableObjects } from "./services/vulnerableObjectService";
 
 import type {
-  WeatherResult
-} from "./services/weatherService";
-
-import {
-  getVulnerableObjects
-} from "./services/vulnerableObjectService";
-
-import type {
-  VulnerableObject
+  VulnerableObject,
 } from "./services/vulnerableObjectService";
 
 
 function App() {
 
-  // ============================================
+  // ==================================================
   // LOCATIE
-  // ============================================
+  // ==================================================
 
-  const [
-    location,
-    setLocation
-  ] = useState({
-
+  const [location, setLocation] = useState({
     latitude: 52.1326,
-
     longitude: 5.2913,
-
-    address: ""
-
+    address: "",
   });
 
 
-  // ============================================
+  // ==================================================
   // WEER
-  // ============================================
+  // ==================================================
 
-  const [
-    weather,
-    setWeather
-  ] = useState<WeatherResult | null>(
-    null
-  );
+  const [weather, setWeather] =
+    useState<WeatherResult | null>(null);
 
 
-  // ============================================
-  // OBJECTEN
-  // ============================================
+  // ==================================================
+  // KWETSBARE OBJECTEN
+  // ==================================================
 
-  const [
-    objects,
-    setObjects
-  ] = useState<VulnerableObject[]>([]);
+  const [objects, setObjects] =
+    useState<VulnerableObject[]>([]);
 
-
-  const [
-    objectsLoading,
-    setObjectsLoading
-  ] = useState(false);
+  const [objectsLoading, setObjectsLoading] =
+    useState(false);
 
 
-  // ============================================
+  // ==================================================
   // OBJECTEN OPHALEN
-  // ============================================
+  // ==================================================
 
   async function loadObjects(
     latitude: number,
     longitude: number
   ) {
 
-    console.log(
-      "🔎 Objecten ophalen..."
-    );
+    console.log("🔎 Kwetsbare objecten ophalen...");
+    console.log("📍 Locatie:", latitude, longitude);
+    console.log("📏 Zoekradius: 1000 meter");
 
     setObjectsLoading(true);
 
@@ -96,8 +74,13 @@ function App() {
         );
 
       console.log(
-        "✅ Objecten ontvangen:",
+        "✅ Kwetsbare objecten ontvangen:",
         result.length
+      );
+
+      console.log(
+        "📍 Objecten:",
+        result
       );
 
       setObjects(result);
@@ -105,7 +88,7 @@ function App() {
     } catch (error) {
 
       console.error(
-        "❌ Fout bij objecten:",
+        "❌ Fout bij ophalen kwetsbare objecten:",
         error
       );
 
@@ -120,9 +103,9 @@ function App() {
   }
 
 
-  // ============================================
-  // LOCATIE GEVONDEN
-  // ============================================
+  // ==================================================
+  // NIEUWE INCIDENTLOCATIE
+  // ==================================================
 
   async function handleLocationFound(
     locationData: {
@@ -133,19 +116,16 @@ function App() {
   ) {
 
     console.log(
-      "📍 Nieuwe locatie:",
+      "📍 Nieuwe incidentlocatie:",
       locationData
     );
 
-
-    setLocation(
-      locationData
-    );
+    setLocation(locationData);
 
 
-    // -----------------------------
-    // WEER
-    // -----------------------------
+    // ==================================================
+    // WEER OPHALEN
+    // ==================================================
 
     try {
 
@@ -155,14 +135,17 @@ function App() {
           locationData.longitude
         );
 
-      setWeather(
+      console.log(
+        "🌤️ Weer ontvangen:",
         weatherData
       );
+
+      setWeather(weatherData);
 
     } catch (error) {
 
       console.error(
-        "❌ Fout bij weer:",
+        "❌ Fout bij ophalen weer:",
         error
       );
 
@@ -171,9 +154,9 @@ function App() {
     }
 
 
-    // -----------------------------
-    // OBJECTEN
-    // -----------------------------
+    // ==================================================
+    // OBJECTEN OPHALEN
+    // ==================================================
 
     await loadObjects(
       locationData.latitude,
@@ -183,9 +166,9 @@ function App() {
   }
 
 
-  // ============================================
-  // AFSTAND
-  // ============================================
+  // ==================================================
+  // AFSTAND BEREKENEN
+  // ==================================================
 
   function distanceInMeters(
     lat1: number,
@@ -197,18 +180,29 @@ function App() {
     const R = 6371000;
 
     const dLat =
-      (lat2 - lat1) * Math.PI / 180;
+      (lat2 - lat1) *
+      Math.PI /
+      180;
 
     const dLon =
-      (lon2 - lon1) * Math.PI / 180;
+      (lon2 - lon1) *
+      Math.PI /
+      180;
 
     const a =
       Math.sin(dLat / 2) *
-        Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) *
-        Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.sin(dLat / 2) +
+
+      Math.cos(
+        lat1 * Math.PI / 180
+      ) *
+
+      Math.cos(
+        lat2 * Math.PI / 180
+      ) *
+
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
 
     const c =
       2 *
@@ -222,27 +216,49 @@ function App() {
   }
 
 
-  // ============================================
-  // ICOON
-  // ============================================
+  // ==================================================
+  // ICOON PER OBJECTTYPE
+  // ==================================================
 
-  function iconForType(
-    type: string
-  ) {
+  function iconForType(type: string) {
 
     switch (type) {
-
-      case "school":
-        return "🏫";
 
       case "hospital":
         return "🏥";
 
+      case "clinic":
+        return "⚕️";
+
+      case "healthcare":
+        return "⚕️";
+
+      case "nursing_home":
+        return "👵";
+
+      case "care":
+        return "♿";
+
+      case "school":
+        return "🏫";
+
+      case "kindergarten":
+        return "👶";
+
       case "church":
         return "⛪";
 
-      case "shop":
-        return "🏪";
+      case "supermarket":
+        return "🛒";
+
+      case "department_store":
+        return "🏬";
+
+      case "mall":
+        return "🏬";
+
+      case "hardware_store":
+        return "🔨";
 
       case "community":
         return "🏢";
@@ -255,32 +271,104 @@ function App() {
   }
 
 
-  // ============================================
-  // CATEGORIE
-  // ============================================
+  // ==================================================
+  // NEDERLANDSE NAAM OBJECTTYPE
+  // ==================================================
 
-  function categoryForType(
-    type: string
-  ) {
+  function objectTypeName(type: string) {
 
     switch (type) {
 
       case "hospital":
-        return "Zorg";
+        return "Ziekenhuis";
+
+      case "clinic":
+        return "Kliniek";
+
+      case "healthcare":
+        return "Gezondheidszorg";
+
+      case "nursing_home":
+        return "Verpleeghuis";
+
+      case "care":
+        return "Zorginstelling";
 
       case "school":
-        return "Onderwijs";
+        return "School";
+
+      case "kindergarten":
+        return "Kinderopvang";
 
       case "church":
-        return "Religie";
+        return "Kerk";
 
-      case "shop":
-        return "Winkels";
+      case "supermarket":
+        return "Supermarkt";
+
+      case "department_store":
+        return "Groot warenhuis";
+
+      case "mall":
+        return "Winkelcentrum";
+
+      case "hardware_store":
+        return "Bouwmarkt";
 
       case "community":
-        return "Maatschappelijk";
+        return "Maatschappelijke instelling";
 
       default:
+        return "Overige locatie";
+
+    }
+
+  }
+
+
+  // ==================================================
+  // CATEGORIE BEPALEN
+  // ==================================================
+
+  function categoryForType(type: string) {
+
+    switch (type) {
+
+      case "hospital":
+      case "clinic":
+      case "healthcare":
+      case "nursing_home":
+      case "care":
+
+        return "Zorg";
+
+
+      case "school":
+      case "kindergarten":
+
+        return "Onderwijs";
+
+
+      case "church":
+
+        return "Religie";
+
+
+      case "supermarket":
+      case "department_store":
+      case "mall":
+      case "hardware_store":
+
+        return "Grote winkels";
+
+
+      case "community":
+
+        return "Maatschappelijk";
+
+
+      default:
+
         return "Overig";
 
     }
@@ -288,13 +376,11 @@ function App() {
   }
 
 
-  // ============================================
+  // ==================================================
   // CATEGORIE ICOON
-  // ============================================
+  // ==================================================
 
-  function categoryIcon(
-    category: string
-  ) {
+  function categoryIcon(category: string) {
 
     switch (category) {
 
@@ -307,8 +393,8 @@ function App() {
       case "Religie":
         return "⛪";
 
-      case "Winkels":
-        return "🏪";
+      case "Grote winkels":
+        return "🛒";
 
       case "Maatschappelijk":
         return "🏢";
@@ -321,9 +407,9 @@ function App() {
   }
 
 
-  // ============================================
-  // OBJECTEN CATEGORISEREN
-  // ============================================
+  // ==================================================
+  // OBJECTEN GROEPEREN
+  // ==================================================
 
   const groupedObjects =
     objects.reduce(
@@ -343,9 +429,7 @@ function App() {
 
         }
 
-        groups[category].push(
-          object
-        );
+        groups[category].push(object);
 
         return groups;
 
@@ -357,30 +441,32 @@ function App() {
     );
 
 
-  // ============================================
-  // CATEGORIE VOLGORDE
-  // ============================================
+  // ==================================================
+  // VOLGORDE CATEGORIEËN
+  // ==================================================
 
   const categoryOrder = [
     "Zorg",
     "Onderwijs",
     "Religie",
-    "Winkels",
+    "Grote winkels",
     "Maatschappelijk",
-    "Overig"
+    "Overig",
   ];
 
 
-  // ============================================
+  // ==================================================
   // RENDER
-  // ============================================
+  // ==================================================
 
   return (
 
     <div className="app">
 
 
-      {/* HEADER */}
+      {/* ==================================================
+          HEADER
+      ================================================== */}
 
       <header className="header">
 
@@ -399,7 +485,9 @@ function App() {
       </header>
 
 
-      {/* ZOEKEN */}
+      {/* ==================================================
+          ZOEKEN
+      ================================================== */}
 
       <section className="search-panel">
 
@@ -416,12 +504,16 @@ function App() {
       </section>
 
 
-      {/* DASHBOARD */}
+      {/* ==================================================
+          DASHBOARD
+      ================================================== */}
 
       <main className="dashboard">
 
 
-        {/* WEER */}
+        {/* ==================================================
+            WEER
+        ================================================== */}
 
         <section className="panel weather-panel">
 
@@ -436,7 +528,9 @@ function App() {
         </section>
 
 
-        {/* OBJECTEN */}
+        {/* ==================================================
+            KWETSBARE OBJECTEN
+        ================================================== */}
 
         <section className="panel objects-panel">
 
@@ -458,15 +552,28 @@ function App() {
           </div>
 
 
+          {/* ==================================================
+              LADEN
+          ================================================== */}
+
           {objectsLoading ? (
 
             <div className="objects-loading">
+
+              <div className="loading-spinner">
+                ⟳
+              </div>
 
               Objecten worden opgehaald...
 
             </div>
 
+
           ) : objects.length === 0 ? (
+
+            /* ==================================================
+               GEEN OBJECTEN
+            ================================================== */
 
             <div className="objects-empty">
 
@@ -480,7 +587,12 @@ function App() {
 
             </div>
 
+
           ) : (
+
+            /* ==================================================
+               OBJECTEN
+            ================================================== */
 
             <div className="objects-list">
 
@@ -489,6 +601,7 @@ function App() {
 
                   const categoryObjects =
                     groupedObjects[category];
+
 
                   if (
                     !categoryObjects ||
@@ -499,6 +612,10 @@ function App() {
 
                   }
 
+
+                  // ------------------------------------------
+                  // SORTEREN OP AFSTAND
+                  // ------------------------------------------
 
                   const sortedObjects =
                     [...categoryObjects].sort(
@@ -537,7 +654,9 @@ function App() {
                     >
 
 
-                      {/* CATEGORIE HEADER */}
+                      {/* ==================================================
+                          CATEGORIE HEADER
+                      ================================================== */}
 
                       <div className="object-category-title">
 
@@ -564,7 +683,9 @@ function App() {
                       </div>
 
 
-                      {/* OBJECTEN */}
+                      {/* ==================================================
+                          OBJECTLIJST
+                      ================================================== */}
 
                       <div className="object-category-list">
 
@@ -584,9 +705,11 @@ function App() {
 
                               <div
                                 className="object-row"
-                                key={obj.id}
+                                key={`${obj.id}-${obj.type}`}
                               >
 
+
+                                {/* OBJECT ICOON */}
 
                                 <div className="object-icon">
 
@@ -596,6 +719,8 @@ function App() {
 
                                 </div>
 
+
+                                {/* OBJECT INFORMATIE */}
 
                                 <div className="object-details">
 
@@ -607,21 +732,27 @@ function App() {
 
                                   <div className="object-type">
 
-                                    {obj.type}
+                                    {objectTypeName(
+                                      obj.type
+                                    )}
 
                                   </div>
 
                                 </div>
 
 
+                                {/* AFSTAND */}
+
                                 <div className="object-distance">
 
-                                  {Math.round(
-                                    distance
-                                  )} m
+                                  {distance < 1000
+                                    ? `${Math.round(distance)} m`
+                                    : `${(
+                                        distance / 1000
+                                      ).toFixed(1)} km`
+                                  }
 
                                 </div>
-
 
                               </div>
 
@@ -646,7 +777,9 @@ function App() {
         </section>
 
 
-        {/* KAART */}
+        {/* ==================================================
+            KAART
+        ================================================== */}
 
         <section className="panel map-panel">
 
