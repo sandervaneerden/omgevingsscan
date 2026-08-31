@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import "./App.css";
 
 import SearchBar from "./components/SearchBar";
@@ -22,29 +22,17 @@ import type {
 } from "./services/vulnerableObjectService";
 
 
-// =========================================================
-// INSTELLINGEN
-// =========================================================
+/* =========================================================
+   CONSTANTEN
+   ========================================================= */
 
-/*
- * Centrale zoekradius voor kwetsbare objecten.
- *
- * Deze waarde wordt gebruikt voor:
- *
- * - de API-aanvraag
- * - de objectenlijst
- * - de blauwe zoekcirkel op de kaart
- *
- * Hierdoor kunnen lijst en kaart niet meer verschillende
- * afstanden gebruiken.
- */
-
-const SEARCH_RADIUS = 500;
+const OBJECT_SEARCH_RADIUS = 3000;
+const OBJECT_CIRCLE_RADIUS = 500;
 
 
-// =========================================================
-// CATEGORIEËN
-// =========================================================
+/* =========================================================
+   CATEGORIEËN
+   ========================================================= */
 
 type Category =
   | "Zorg"
@@ -55,9 +43,9 @@ type Category =
   | "Overig";
 
 
-// =========================================================
-// AFSTAND BEREKENEN
-// =========================================================
+/* =========================================================
+   AFSTAND BEREKENEN
+   ========================================================= */
 
 function distanceInMeters(
   lat1: number,
@@ -93,9 +81,61 @@ function distanceInMeters(
 }
 
 
-// =========================================================
-// TYPE → CATEGORIE
-// =========================================================
+/* =========================================================
+   PUNT IN POLYGON
+   ========================================================= */
+
+function pointInPolygon(
+  latitude: number,
+  longitude: number,
+  polygon: [number, number][]
+): boolean {
+
+  if (polygon.length < 3) {
+    return false;
+  }
+
+  let inside = false;
+
+  for (
+    let i = 0, j = polygon.length - 1;
+    i < polygon.length;
+    j = i++
+  ) {
+
+    const latitudeI = polygon[i][0];
+    const longitudeI = polygon[i][1];
+
+    const latitudeJ = polygon[j][0];
+    const longitudeJ = polygon[j][1];
+
+    const intersects =
+      (
+        (latitudeI > latitude) !==
+        (latitudeJ > latitude)
+      ) &&
+      (
+        longitude <
+        (
+          (longitudeJ - longitudeI) *
+            (latitude - latitudeI) /
+            (latitudeJ - latitudeI) +
+          longitudeI
+        )
+      );
+
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+
+/* =========================================================
+   TYPE → CATEGORIE
+   ========================================================= */
 
 function categoryForType(
   type: string
@@ -148,9 +188,9 @@ function categoryForType(
 }
 
 
-// =========================================================
-// TYPE → NEDERLANDSE NAAM
-// =========================================================
+/* =========================================================
+   TYPE → NEDERLANDSE NAAM
+   ========================================================= */
 
 function objectTypeName(
   type: string
@@ -251,9 +291,9 @@ function objectTypeName(
 }
 
 
-// =========================================================
-// TYPE → ICOON
-// =========================================================
+/* =========================================================
+   TYPE → ICOON
+   ========================================================= */
 
 function iconForType(
   type: string
@@ -354,9 +394,9 @@ function iconForType(
 }
 
 
-// =========================================================
-// CATEGORIE → ICOON
-// =========================================================
+/* =========================================================
+   CATEGORIE → ICOON
+   ========================================================= */
 
 function categoryIcon(
   category: Category
@@ -385,9 +425,9 @@ function categoryIcon(
 }
 
 
-// =========================================================
-// CATEGORIE VOLGORDE
-// =========================================================
+/* =========================================================
+   CATEGORIE VOLGORDE
+   ========================================================= */
 
 const categoryOrder: Category[] = [
   "Zorg",
@@ -399,15 +439,15 @@ const categoryOrder: Category[] = [
 ];
 
 
-// =========================================================
-// APP
-// =========================================================
+/* =========================================================
+   APP
+   ========================================================= */
 
 function App() {
 
-  // =======================================================
-  // LOCATIE
-  // =======================================================
+  /* =======================================================
+     LOCATIE
+     ======================================================= */
 
   const [
     location,
@@ -419,9 +459,9 @@ function App() {
   });
 
 
-  // =======================================================
-  // WEER
-  // =======================================================
+  /* =======================================================
+     WEER
+     ======================================================= */
 
   const [
     weather,
@@ -429,9 +469,9 @@ function App() {
   ] = useState<WeatherResult | null>(null);
 
 
-  // =======================================================
-  // OBJECTEN
-  // =======================================================
+  /* =======================================================
+     OBJECTEN
+     ======================================================= */
 
   const [
     objects,
@@ -444,58 +484,32 @@ function App() {
   ] = useState(false);
 
 
-  // =======================================================
-  // OBJECTEN OPHALEN
-  // =======================================================
+  /* =======================================================
+     GASZONE
+     ======================================================= */
 
-  async function loadObjects(
-    latitude: number,
-    longitude: number
-  ) {
-
-    console.log(
-      "🔎 Objecten ophalen binnen:",
-      SEARCH_RADIUS,
-      "meter"
-    );
-
-    setObjectsLoading(true);
-
-    try {
-
-      const result =
-        await getVulnerableObjects(
-          latitude,
-          longitude,
-          SEARCH_RADIUS
-        );
-
-      console.log(
-        "✅ Objecten ontvangen:",
-        result.length
-      );
-
-      setObjects(result);
-
-    } catch (error) {
-
-      console.error(
-        "❌ Fout bij objecten:",
-        error
-      );
-
-      setObjects([]);
-
-    } finally {
-
-      setObjectsLoading(false);
-    }
-  }
+  const [
+    gasZone,
+    setGasZone
+  ] = useState<[number, number][]>([]);
 
 
-  // =======================================================
-  // LOCATIE GEVONDEN
-  // =======================================================
+  /* =======================================================
+     AANVRAAG-ID
+     
+     Iedere nieuwe zoekopdracht krijgt een eigen nummer.
+     
+     Hierdoor kunnen resultaten van een oude zoekopdracht
+     niet meer de nieuwe locatie overschrijven.
+     ======================================================= */
+
+  const requestIdRef =
+    useRef(0);
+
+
+  /* =======================================================
+     LOCATIE GEVONDEN
+     ======================================================= */
 
   async function handleLocationFound(
     locationData: {
@@ -505,72 +519,183 @@ function App() {
     }
   ) {
 
+    /* -----------------------------------------------------
+       NIEUWE AANVRAAG
+       ----------------------------------------------------- */
+
+    requestIdRef.current += 1;
+
+    const requestId =
+      requestIdRef.current;
+
+
     console.log(
       "📍 Nieuwe locatie:",
       locationData
     );
 
+    console.log(
+      "🔄 Zoekopdracht:",
+      requestId
+    );
 
-    // -------------------------------------------------------
-    // NIEUWE LOCATIE INSTELLEN
-    // -------------------------------------------------------
+
+    /* -----------------------------------------------------
+       LOCATIE DIRECT INSTELLEN
+       ----------------------------------------------------- */
 
     setLocation(locationData);
 
 
-    // -------------------------------------------------------
-    // OUDE METEO WISSEN
-    // -------------------------------------------------------
+    /* -----------------------------------------------------
+       OUDE DATA WISSEN
+       ----------------------------------------------------- */
 
     setWeather(null);
 
-
-    // -------------------------------------------------------
-    // OUDE OBJECTEN WISSEN
-    // -------------------------------------------------------
-
     setObjects([]);
 
+    setGasZone([]);
 
-    // -------------------------------------------------------
-    // WEER OPHALEN
-    // -------------------------------------------------------
+    setObjectsLoading(true);
+
+
+    /* =====================================================
+       WEER EN OBJECTEN TEGELIJK OPHALEN
+       ===================================================== */
+
+    const weatherPromise =
+      getWeather(
+        locationData.latitude,
+        locationData.longitude
+      );
+
+    const objectsPromise =
+      getVulnerableObjects(
+        locationData.latitude,
+        locationData.longitude,
+        OBJECT_SEARCH_RADIUS
+      );
+
+
+    /* =====================================================
+       WEER
+       ===================================================== */
 
     try {
 
       const weatherData =
-        await getWeather(
-          locationData.latitude,
-          locationData.longitude
+        await weatherPromise;
+
+
+      if (
+        requestId !== requestIdRef.current
+      ) {
+
+        console.log(
+          "⚠️ Oude weer-aanvraag genegeerd."
         );
 
-      setWeather(weatherData);
+      } else {
+
+        console.log(
+          "🌤️ Nieuwe weersgegevens ontvangen."
+        );
+
+        setWeather(weatherData);
+
+      }
 
     } catch (error) {
 
-      console.error(
-        "❌ Fout bij weer:",
-        error
-      );
+      if (
+        requestId === requestIdRef.current
+      ) {
 
-      setWeather(null);
+        console.error(
+          "❌ Fout bij ophalen weer:",
+          error
+        );
+
+        setWeather(null);
+
+      }
     }
 
 
-    // -------------------------------------------------------
-    // OBJECTEN OPHALEN
-    // -------------------------------------------------------
+    /* =====================================================
+       OBJECTEN
+       ===================================================== */
 
-    await loadObjects(
-      locationData.latitude,
-      locationData.longitude
-    );
+    try {
+
+      const objectData =
+        await objectsPromise;
+
+
+      if (
+        requestId !== requestIdRef.current
+      ) {
+
+        console.log(
+          "⚠️ Oude object-aanvraag genegeerd."
+        );
+
+      } else {
+
+        console.log(
+          "🏢 Nieuwe objecten ontvangen:",
+          objectData.length
+        );
+
+        setObjects(objectData);
+
+      }
+
+    } catch (error) {
+
+      if (
+        requestId === requestIdRef.current
+      ) {
+
+        console.error(
+          "❌ Fout bij ophalen objecten:",
+          error
+        );
+
+        setObjects([]);
+
+      }
+
+    } finally {
+
+      if (
+        requestId === requestIdRef.current
+      ) {
+
+        setObjectsLoading(false);
+
+      }
+    }
   }
 
 
-  // =======================================================
-  // FILTER ONBETROUWBARE OBJECTEN
-  // =======================================================
+  /* =========================================================
+     OBJECTEN FILTEREN
+     
+     Een object wordt zichtbaar wanneer het:
+     
+     1. binnen 500 meter van het incident ligt
+     
+     OF
+     
+     2. binnen de actuele gasmal ligt.
+     
+     De backend zoekt 3000 meter.
+     
+     Hierdoor kunnen ook objecten die bijvoorbeeld 1,5 of
+     2 kilometer benedenwinds liggen in de gasmal verschijnen.
+     ========================================================= */
 
   const visibleObjects =
     objects.filter(
@@ -582,10 +707,9 @@ function App() {
             .toLowerCase();
 
 
-        /*
-         * Naamloze winkelcentra zijn geen afzonderlijke
-         * operationele objecten.
-         */
+        /* ---------------------------------------------------
+           NAAMLOZE WINKELCENTRA NIET TONEN
+           --------------------------------------------------- */
 
         if (
           (
@@ -602,14 +726,60 @@ function App() {
           return false;
         }
 
-        return true;
+
+        /* ---------------------------------------------------
+           AFSTAND
+           --------------------------------------------------- */
+
+        const distance =
+          distanceInMeters(
+            location.latitude,
+            location.longitude,
+            object.latitude,
+            object.longitude
+          );
+
+
+        /* ---------------------------------------------------
+           BINNEN 500 METER
+           --------------------------------------------------- */
+
+        if (
+          distance <= OBJECT_CIRCLE_RADIUS
+        ) {
+
+          return true;
+        }
+
+
+        /* ---------------------------------------------------
+           GASZONE NOG NIET BESCHIKBAAR
+           --------------------------------------------------- */
+
+        if (
+          gasZone.length < 3
+        ) {
+
+          return false;
+        }
+
+
+        /* ---------------------------------------------------
+           BINNEN GASZONE
+           --------------------------------------------------- */
+
+        return pointInPolygon(
+          object.latitude,
+          object.longitude,
+          gasZone
+        );
       }
     );
 
 
-  // =======================================================
-  // OBJECTEN GROEPEREN
-  // =======================================================
+  /* =========================================================
+     OBJECTEN GROEPEREN
+     ========================================================= */
 
   const groupedObjects =
     visibleObjects.reduce(
@@ -639,20 +809,19 @@ function App() {
     );
 
 
-  // =======================================================
-  // TOTAAL
-  // =======================================================
+  /* =========================================================
+     TOTAAL
+     ========================================================= */
 
   const totalVisibleObjects =
     visibleObjects.length;
 
 
-  // =======================================================
-  // RENDER
-  // =======================================================
+  /* =========================================================
+     RENDER
+     ========================================================= */
 
   return (
-
     <div className="app">
 
       {/* ===================================================
@@ -744,7 +913,7 @@ function App() {
 
 
           {/* ------------------------------------------------
-              STATUS
+              LADEN
               ------------------------------------------------ */}
 
           {objectsLoading ? (
@@ -794,9 +963,9 @@ function App() {
                   }
 
 
-                  // -----------------------------------------
-                  // SORTEREN OP AFSTAND
-                  // -----------------------------------------
+                  /* -----------------------------------------
+                     SORTEREN OP AFSTAND
+                     ----------------------------------------- */
 
                   const sortedObjects =
                     [...categoryObjects].sort(
@@ -946,8 +1115,8 @@ function App() {
             windDirection={weather?.windDirection ?? 0}
             windSpeed={weather?.windSpeed ?? 0}
             weatherLoaded={weather !== null}
-            objects={visibleObjects}
-            searchRadius={SEARCH_RADIUS}
+            objects={objects}
+            onGasZoneCreated={setGasZone}
           />
 
         </section>

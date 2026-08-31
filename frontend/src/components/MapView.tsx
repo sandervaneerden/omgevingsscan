@@ -9,7 +9,7 @@ import {
 import "leaflet/dist/leaflet.css";
 
 import L from "leaflet";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import RiskArea from "./RiskArea";
 import MapUpdater from "./MapUpdater";
@@ -20,16 +20,20 @@ import type {
 } from "../services/vulnerableObjectService";
 
 
-// =========================================================
-// LEAFLET MARKER CORRECT LADEN IN VITE
-// =========================================================
+/* =========================================================
+   CONSTANTEN
+   ========================================================= */
 
-delete (
-  L.Icon.Default.prototype as any
-)._getIconUrl;
+const OBJECT_CIRCLE_RADIUS = 500;
+
+
+/* =========================================================
+   LEAFLET MARKER CORRECT LADEN IN VITE
+   ========================================================= */
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
 
 L.Icon.Default.mergeOptions({
-
   iconRetinaUrl:
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
 
@@ -38,13 +42,12 @@ L.Icon.Default.mergeOptions({
 
   shadowUrl:
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png"
-
 });
 
 
-// =========================================================
-// PROPS
-// =========================================================
+/* =========================================================
+   PROPS
+   ========================================================= */
 
 interface MapViewProps {
 
@@ -60,50 +63,40 @@ interface MapViewProps {
 
   objects: VulnerableObject[];
 
-  searchRadius: number;
-
+  onGasZoneCreated?: (
+    points: [number, number][]
+  ) => void;
 }
 
 
-// =========================================================
-// MAPVIEW
-// =========================================================
+/* =========================================================
+   MAPVIEW
+   ========================================================= */
 
 function MapView({
-
   latitude,
-
   longitude,
-
   windDirection,
-
   windSpeed,
-
   weatherLoaded,
-
   objects,
-
-  searchRadius
-
+  onGasZoneCreated
 }: MapViewProps) {
 
 
-  // =======================================================
-  // KAARTPOSITIE
-  // =======================================================
+  /* =======================================================
+     KAARTPOSITIE
+     ======================================================= */
 
   const position: [number, number] = [
-
     latitude,
-
     longitude
-
   ];
 
 
-  // =======================================================
-  // GASZONE
-  // =======================================================
+  /* =======================================================
+     GASZONE
+     ======================================================= */
 
   const [
     gasZone,
@@ -111,37 +104,84 @@ function MapView({
   ] = useState<[number, number][]>([]);
 
 
-  // =======================================================
-  // WINDRICHTING
-  //
-  // Meteorologische windrichting geeft aan waar de wind
-  // vandaan komt.
-  //
-  // Gas verspreidt zich met de wind mee.
-  // Daarom draaien we de richting 180 graden.
-  // =======================================================
+  /* =======================================================
+     NIEUWE LOCATIE
+     
+     Wanneer een nieuw adres wordt gezocht:
+     
+     - oude gasmal verwijderen
+     - oude selectie verwijderen
+     - daarna wordt de nieuwe gasmal opgebouwd
+     ======================================================= */
+
+  useEffect(() => {
+
+    console.log(
+      "📍 MapView: nieuwe locatie"
+    );
+
+    setGasZone([]);
+
+  }, [
+    latitude,
+    longitude
+  ]);
+
+
+  /* =======================================================
+     WINDRICHTING
+     
+     De meteorologische windrichting geeft aan waar de wind
+     vandaan komt.
+     
+     De gaswolk verspreidt zich met de wind mee.
+     
+     Daarom draaien we de richting 180 graden.
+     ======================================================= */
 
   const dispersionDirection =
     (windDirection + 180) % 360;
 
 
-  // =======================================================
-  // KAART
-  // =======================================================
+  /* =======================================================
+     GASZONE AANGEMAAKT
+     ======================================================= */
+
+  function handleGasZoneCreated(
+    points: [number, number][]
+  ) {
+
+    console.log(
+      "🔴 Gaszone aangemaakt:",
+      points.length,
+      "punten"
+    );
+
+
+    setGasZone(points);
+
+
+    if (onGasZoneCreated) {
+
+      onGasZoneCreated(points);
+
+    }
+  }
+
+
+  /* =======================================================
+     KAART
+     ======================================================= */
 
   return (
 
     <MapContainer
-
       center={position}
-
       zoom={15}
-
       style={{
         height: "600px",
         width: "100%"
       }}
-
     >
 
       {/* =================================================
@@ -159,11 +199,8 @@ function MapView({
           ================================================= */}
 
       <TileLayer
-
         attribution="&copy; OpenStreetMap contributors"
-
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-
       />
 
 
@@ -183,53 +220,42 @@ function MapView({
 
 
       {/* =================================================
-          ZOEKCIRKEL
-          
-          De radius komt rechtstreeks uit App.tsx.
-          Hierdoor gebruikt de kaart exact dezelfde
-          radius als de objectenlijst en API.
+          500 METER CIRKEL
           ================================================= */}
 
       <Circle
-
         center={position}
-
-        radius={searchRadius}
-
+        radius={OBJECT_CIRCLE_RADIUS}
         pathOptions={{
           color: "blue",
           fillColor: "blue",
           fillOpacity: 0.05,
           weight: 2
         }}
-
       />
 
 
       {/* =================================================
           GASZONE
-
-          Alleen tonen wanneer actuele meteo beschikbaar is.
-
-          Bij weatherLoaded = false wordt RiskArea niet
-          geladen, zodat een oude gasmal niet zichtbaar
-          blijft voordat nieuwe meteo beschikbaar is.
+          
+          BELANGRIJK:
+          
+          De gasmal staat los van de 500-metercirkel.
+          
+          RiskArea bepaalt zelf de volledige lengte van de
+          gasmal op basis van windrichting en windsnelheid.
+          
+          De gasmal kan daardoor bijvoorbeeld 2 km lang zijn.
           ================================================= */}
 
       {weatherLoaded && (
 
         <RiskArea
-
           latitude={latitude}
-
           longitude={longitude}
-
           windDirection={dispersionDirection}
-
           windSpeed={windSpeed}
-
-          onZoneCreated={setGasZone}
-
+          onZoneCreated={handleGasZoneCreated}
         />
 
       )}
@@ -237,25 +263,22 @@ function MapView({
 
       {/* =================================================
           KWETSBARE OBJECTEN
-
-          De objecten worden door App.tsx opgehaald.
-          MapView doet zelf geen API-call.
+          
+          App.tsx geeft hier ALLE objecten uit de 3 km
+          zoekopdracht door.
+          
+          VulnerableObjects bepaalt vervolgens zelf welke
+          objecten daadwerkelijk op de kaart komen.
           ================================================= */}
 
       <VulnerableObjects
-
         latitude={latitude}
-
         longitude={longitude}
-
         gasZone={gasZone}
-
         objects={objects}
-
       />
 
     </MapContainer>
-
   );
 }
 
