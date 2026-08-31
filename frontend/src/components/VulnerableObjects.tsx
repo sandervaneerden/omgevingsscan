@@ -16,12 +16,18 @@ interface Props {
   objects: VulnerableObject[];
 }
 
+
+// =========================================================
+// AFSTAND BEREKENEN
+// =========================================================
+
 function distanceInMeters(
   lat1: number,
   lon1: number,
   lat2: number,
   lon2: number
 ): number {
+
   const R = 6371000;
 
   const dLat =
@@ -48,11 +54,17 @@ function distanceInMeters(
   return R * c;
 }
 
+
+// =========================================================
+// CONTROLEREN OF OBJECT IN GASZONE ZIT
+// =========================================================
+
 function pointInGasZone(
   latitude: number,
   longitude: number,
   zone: [number, number][]
 ): boolean {
+
   if (zone.length < 3) {
     return false;
   }
@@ -64,6 +76,7 @@ function pointInGasZone(
     i < zone.length;
     j = i++
   ) {
+
     const lat1 = zone[i][0];
     const lon1 = zone[i][1];
 
@@ -87,37 +100,337 @@ function pointInGasZone(
   return inside;
 }
 
+
+// =========================================================
+// VASTE SVG ICONEN
+// =========================================================
+
 function iconForType(type: string) {
-  let icon = "📍";
 
-  if (type === "school") {
-    icon = "🏫";
+  let icon = `
+    <svg
+      viewBox="0 0 32 32"
+      width="30"
+      height="30"
+    >
+      <circle
+        cx="16"
+        cy="16"
+        r="11"
+        fill="#607d8b"
+      />
+
+      <circle
+        cx="16"
+        cy="16"
+        r="4"
+        fill="white"
+      />
+    </svg>
+  `;
+
+
+  switch (type) {
+
+    // =====================================================
+    // ZIEKENHUIS
+    // =====================================================
+
+    case "hospital":
+    case "clinic":
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <rect
+            x="5"
+            y="4"
+            width="22"
+            height="24"
+            rx="2"
+            fill="#d32f2f"
+          />
+
+          <rect
+            x="13"
+            y="8"
+            width="6"
+            height="16"
+            fill="white"
+          />
+
+          <rect
+            x="8"
+            y="13"
+            width="16"
+            height="6"
+            fill="white"
+          />
+
+        </svg>
+      `;
+
+      break;
+
+
+    // =====================================================
+    // ZORG
+    // =====================================================
+
+    case "healthcare":
+    case "care":
+    case "nursing_home":
+    case "care_home":
+    case "residential_care":
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <circle
+            cx="16"
+            cy="16"
+            r="13"
+            fill="#1976d2"
+          />
+
+          <path
+            d="M16 8V24"
+            stroke="white"
+            stroke-width="3"
+            stroke-linecap="round"
+          />
+
+          <path
+            d="M8 16H24"
+            stroke="white"
+            stroke-width="3"
+            stroke-linecap="round"
+          />
+
+        </svg>
+      `;
+
+      break;
+
+
+    // =====================================================
+    // ONDERWIJS
+    // =====================================================
+
+    case "school":
+    case "kindergarten":
+    case "childcare":
+    case "college":
+    case "university":
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <path
+            d="M3 13L16 4L29 13L16 22L3 13Z"
+            fill="#f9a825"
+          />
+
+          <path
+            d="M8 16V27H24V16"
+            fill="#f9a825"
+          />
+
+          <rect
+            x="13"
+            y="20"
+            width="6"
+            height="7"
+            fill="white"
+          />
+
+        </svg>
+      `;
+
+      break;
+
+
+    // =====================================================
+    // RELIGIE
+    // =====================================================
+
+    case "church":
+    case "place_of_worship":
+    case "mosque":
+    case "synagogue":
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <path
+            d="M6 27H26"
+            stroke="#7b1fa2"
+            stroke-width="2"
+          />
+
+          <path
+            d="M9 27V15H23V27"
+            fill="#7b1fa2"
+          />
+
+          <path
+            d="M7 15H25L16 7L7 15Z"
+            fill="#7b1fa2"
+          />
+
+          <path
+            d="M16 3V10"
+            stroke="#7b1fa2"
+            stroke-width="2"
+          />
+
+          <path
+            d="M13 6H19"
+            stroke="#7b1fa2"
+            stroke-width="2"
+          />
+
+        </svg>
+      `;
+
+      break;
+
+
+    // =====================================================
+    // WINKEL
+    // =====================================================
+
+    case "shop":
+    case "supermarket":
+    case "department_store":
+    case "shopping_centre":
+    case "mall":
+    case "hardware_store":
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <path
+            d="M5 12L7 5H25L27 12Z"
+            fill="#ef6c00"
+          />
+
+          <rect
+            x="6"
+            y="12"
+            width="20"
+            height="15"
+            fill="#fb8c00"
+          />
+
+          <rect
+            x="11"
+            y="18"
+            width="10"
+            height="9"
+            fill="white"
+          />
+
+        </svg>
+      `;
+
+      break;
+
+
+    // =====================================================
+    // MAATSCHAPPELIJK
+    // =====================================================
+
+    case "community":
+    case "community_centre":
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <path
+            d="M4 14L16 5L28 14V27H4V14Z"
+            fill="#388e3c"
+          />
+
+          <rect
+            x="9"
+            y="17"
+            width="5"
+            height="6"
+            fill="white"
+          />
+
+          <rect
+            x="18"
+            y="17"
+            width="5"
+            height="6"
+            fill="white"
+          />
+
+        </svg>
+      `;
+
+      break;
+
   }
 
-  if (type === "hospital") {
-    icon = "🏥";
-  }
-
-  if (type === "church") {
-    icon = "⛪";
-  }
-
-  if (type === "shop") {
-    icon = "🏪";
-  }
-
-  if (type === "community") {
-    icon = "🏢";
-  }
 
   return L.divIcon({
-    html:
-      '<div style="font-size:24px">' +
-      icon +
-      "</div>",
-    className: ""
+
+    html: `
+      <div
+        style="
+          width: 30px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        "
+      >
+        ${icon}
+      </div>
+    `,
+
+    className: "",
+
+    iconSize: [30, 30],
+
+    iconAnchor: [15, 15],
+
+    popupAnchor: [0, -15]
+
   });
 }
+
+
+// =========================================================
+// COMPONENT
+// =========================================================
 
 export default function VulnerableObjects({
   latitude,
@@ -125,6 +438,16 @@ export default function VulnerableObjects({
   gasZone,
   objects
 }: Props) {
+
+
+  // =======================================================
+  // ALLEEN OBJECTEN BINNEN:
+  //
+  // 1. 500 meter cirkel
+  // OF
+  // 2. GASZONE
+  // =======================================================
+
   const visibleObjects =
     objects.filter((obj) => {
 
@@ -150,7 +473,13 @@ export default function VulnerableObjects({
         insideCircle ||
         insideGasZone
       );
+
     });
+
+
+  // =======================================================
+  // DEBUG
+  // =======================================================
 
   console.log(
     "🟢 Totaal objecten:",
@@ -167,9 +496,16 @@ export default function VulnerableObjects({
     visibleObjects.length
   );
 
+
+  // =======================================================
+  // KAARTOBJECTEN
+  // =======================================================
+
   return (
     <>
+
       {visibleObjects.map((obj) => (
+
         <Marker
           key={obj.id}
           position={[
@@ -178,13 +514,23 @@ export default function VulnerableObjects({
           ]}
           icon={iconForType(obj.type)}
         >
+
           <Popup>
-            <b>{obj.name}</b>
+
+            <b>
+              {obj.name}
+            </b>
+
             <br />
+
             {obj.type}
+
           </Popup>
+
         </Marker>
+
       ))}
+
     </>
   );
 }
