@@ -1,5 +1,5 @@
 import { Polygon } from "react-leaflet";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 
 interface RiskAreaProps {
@@ -13,53 +13,53 @@ interface RiskAreaProps {
   windSpeed: number;
 
   onZoneCreated?: (
-    points:[number,number][]
+    points: [number, number][]
   ) => void;
 
 }
 
 
+// =========================================================
+// PUNT BEREKENEN OP BASIS VAN AFSTAND EN RICHTING
+// =========================================================
 
 function destinationPoint(
 
-  lat:number,
+  lat: number,
 
-  lon:number,
+  lon: number,
 
-  distance:number,
+  distance: number,
 
-  bearing:number
+  bearing: number
 
-):[number,number] {
-
+): [number, number] {
 
   const R = 6371000;
 
+  const brng =
+    bearing * Math.PI / 180;
 
-  const brng = bearing * Math.PI / 180;
+  const lat1 =
+    lat * Math.PI / 180;
 
-  const lat1 = lat * Math.PI / 180;
+  const lon1 =
+    lon * Math.PI / 180;
 
-  const lon1 = lon * Math.PI / 180;
 
+  const lat2 =
+    Math.asin(
 
-  const lat2 = Math.asin(
+      Math.sin(lat1) *
+      Math.cos(distance / R)
 
-    Math.sin(lat1) *
+      +
 
-    Math.cos(distance / R)
+      Math.cos(lat1) *
+      Math.sin(distance / R) *
+      Math.cos(brng)
 
-    +
-
-    Math.cos(lat1) *
-
-    Math.sin(distance / R)
-
-    *
-
-    Math.cos(brng)
-
-  );
+    );
 
 
   const lon2 =
@@ -68,24 +68,13 @@ function destinationPoint(
 
     Math.atan2(
 
-      Math.sin(brng)
-
-      *
-
-      Math.sin(distance / R)
-
-      *
-
+      Math.sin(brng) *
+      Math.sin(distance / R) *
       Math.cos(lat1),
 
-      Math.cos(distance / R)
+      Math.cos(distance / R) -
 
-      -
-
-      Math.sin(lat1)
-
-      *
-
+      Math.sin(lat1) *
       Math.sin(lat2)
 
     );
@@ -102,8 +91,9 @@ function destinationPoint(
 }
 
 
-
-
+// =========================================================
+// GASZONE
+// =========================================================
 
 function RiskArea({
 
@@ -117,144 +107,226 @@ function RiskArea({
 
   onZoneCreated
 
-}:RiskAreaProps) {
+}: RiskAreaProps) {
 
 
+  // =======================================================
+  // WINDSNELHEID
+  //
+  // Open-Meteo levert de windsnelheid in km/h.
+  //
+  // Voor de berekening van de gaszone gebruiken we m/s.
+  // =======================================================
+
+  const windSpeedMs =
+    windSpeed / 3.6;
+
+
+  // =======================================================
+  // LENGTE GASZONE
+  //
+  // Minimum: 300 meter
+  // Vervolgens +250 meter per m/s wind
+  // Maximum: 2800 meter
+  // =======================================================
 
   const length = Math.min(
 
-    1400 + windSpeed * 250,
+    300 + windSpeedMs * 250,
 
     2800
 
   );
 
 
+  // =======================================================
+  // BREEDTE GASZONE
+  // =======================================================
+
   const width = 250;
 
 
-  const points:[number,number][] = [];
+  // =======================================================
+  // PUNTEN VAN DE GASZONE
+  //
+  // De vorm begint bij de incidentlocatie en loopt
+  // vervolgens met de wind mee.
+  // =======================================================
+
+  const points =
+    useMemo(() => {
+
+      const result:
+        [number, number][] = [];
 
 
-  const steps = 40;
+      const steps = 40;
 
 
-  const centerDistance = length / 2;
+      for (
+        let i = 0;
+        i <= steps;
+        i++
+      ) {
+
+        const angle =
+          Math.PI * i / steps;
 
 
-  const center = destinationPoint(
+        /*
+         * Voor iedere positie over de lengte van de
+         * gaszone bepalen we de halve breedte.
+         */
 
-    latitude,
-
-    longitude,
-
-    centerDistance,
-
-    windDirection
-
-  );
+        const forward =
+          (1 - Math.cos(angle)) *
+          (length / 2);
 
 
+        const side =
+          Math.sin(angle) *
+          width;
 
 
+        /*
+         * Middenlijn van de gaszone.
+         */
 
-  for(let i=0;i<=steps;i++){
+        const centerPoint =
+          destinationPoint(
 
+            latitude,
 
-    const angle =
+            longitude,
 
-      Math.PI * 2 * i / steps;
+            forward,
 
+            windDirection
 
-
-    const forward =
-
-      Math.cos(angle)
-
-      *
-
-      centerDistance;
-
+          );
 
 
-    const side =
+        /*
+         * Linkerzijde.
+         */
 
-      Math.sin(angle)
+        const leftPoint =
+          destinationPoint(
 
-      *
+            centerPoint[0],
 
-      width;
+            centerPoint[1],
 
+            side,
 
+            windDirection + 90
 
-    const forwardPoint = destinationPoint(
-
-      center[0],
-
-      center[1],
-
-      Math.abs(forward),
-
-      forward >= 0
-
-        ? windDirection
-
-        : windDirection + 180
-
-    );
+          );
 
 
+        result.push(leftPoint);
 
-    const finalPoint = destinationPoint(
-
-      forwardPoint[0],
-
-      forwardPoint[1],
-
-      Math.abs(side),
-
-      side >= 0
-
-        ? windDirection + 90
-
-        : windDirection - 90
-
-    );
+      }
 
 
-    points.push(finalPoint);
+      /*
+       * Rechterzijde terug naar het begin.
+       */
 
-  }
+      for (
+        let i = steps;
+        i >= 0;
+        i--
+      ) {
+
+        const angle =
+          Math.PI * i / steps;
 
 
+        const forward =
+          (1 - Math.cos(angle)) *
+          (length / 2);
 
 
+        const side =
+          Math.sin(angle) *
+          width;
 
-  useEffect(()=>{
+
+        const centerPoint =
+          destinationPoint(
+
+            latitude,
+
+            longitude,
+
+            forward,
+
+            windDirection
+
+          );
 
 
-    if(onZoneCreated){
+        const rightPoint =
+          destinationPoint(
+
+            centerPoint[0],
+
+            centerPoint[1],
+
+            side,
+
+            windDirection - 90
+
+          );
+
+
+        result.push(rightPoint);
+
+      }
+
+
+      return result;
+
+    }, [
+
+      latitude,
+
+      longitude,
+
+      windDirection,
+
+      windSpeed,
+
+      length
+
+    ]);
+
+
+  // =======================================================
+  // GASZONE DOORGEVEN AAN MAPVIEW
+  // =======================================================
+
+  useEffect(() => {
+
+    if (onZoneCreated) {
 
       onZoneCreated(points);
 
     }
 
+  }, [
 
-  },[
+    points,
 
-    latitude,
-
-    longitude,
-
-    windDirection,
-
-    windSpeed
+    onZoneCreated
 
   ]);
 
 
-
-
+  // =======================================================
+  // TEKEN GASZONE
+  // =======================================================
 
   return (
 
@@ -264,11 +336,13 @@ function RiskArea({
 
       pathOptions={{
 
-        color:"red",
+        color: "red",
 
-        fillColor:"red",
+        fillColor: "red",
 
-        fillOpacity:0.25
+        fillOpacity: 0.25,
+
+        weight: 2
 
       }}
 
@@ -277,7 +351,6 @@ function RiskArea({
   );
 
 }
-
 
 
 export default RiskArea;
