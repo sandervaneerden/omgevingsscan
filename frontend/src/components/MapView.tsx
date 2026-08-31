@@ -24,9 +24,12 @@ import type {
 // LEAFLET MARKER CORRECT LADEN IN VITE
 // =========================================================
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (
+  L.Icon.Default.prototype as any
+)._getIconUrl;
 
 L.Icon.Default.mergeOptions({
+
   iconRetinaUrl:
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
 
@@ -35,6 +38,7 @@ L.Icon.Default.mergeOptions({
 
   shadowUrl:
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png"
+
 });
 
 
@@ -43,12 +47,21 @@ L.Icon.Default.mergeOptions({
 // =========================================================
 
 interface MapViewProps {
+
   latitude: number;
+
   longitude: number;
+
   windDirection: number;
+
   windSpeed: number;
+
   weatherLoaded: boolean;
+
   objects: VulnerableObject[];
+
+  searchRadius: number;
+
 }
 
 
@@ -57,21 +70,34 @@ interface MapViewProps {
 // =========================================================
 
 function MapView({
+
   latitude,
+
   longitude,
+
   windDirection,
+
   windSpeed,
+
   weatherLoaded,
-  objects
+
+  objects,
+
+  searchRadius
+
 }: MapViewProps) {
+
 
   // =======================================================
   // KAARTPOSITIE
   // =======================================================
 
   const position: [number, number] = [
+
     latitude,
+
     longitude
+
   ];
 
 
@@ -79,17 +105,19 @@ function MapView({
   // GASZONE
   // =======================================================
 
-  const [gasZone, setGasZone] =
-    useState<[number, number][]>([]);
+  const [
+    gasZone,
+    setGasZone
+  ] = useState<[number, number][]>([]);
 
 
   // =======================================================
   // WINDRICHTING
   //
-  // De meteorologische windrichting geeft aan waar de wind
+  // Meteorologische windrichting geeft aan waar de wind
   // vandaan komt.
   //
-  // Het gas verspreidt zich met de wind mee.
+  // Gas verspreidt zich met de wind mee.
   // Daarom draaien we de richting 180 graden.
   // =======================================================
 
@@ -104,12 +132,16 @@ function MapView({
   return (
 
     <MapContainer
+
       center={position}
+
       zoom={15}
+
       style={{
         height: "600px",
         width: "100%"
       }}
+
     >
 
       {/* =================================================
@@ -127,8 +159,11 @@ function MapView({
           ================================================= */}
 
       <TileLayer
+
         attribution="&copy; OpenStreetMap contributors"
+
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+
       />
 
 
@@ -148,43 +183,53 @@ function MapView({
 
 
       {/* =================================================
-          ZOEKCIRKEL 500 METER
+          ZOEKCIRKEL
+          
+          De radius komt rechtstreeks uit App.tsx.
+          Hierdoor gebruikt de kaart exact dezelfde
+          radius als de objectenlijst en API.
           ================================================= */}
 
       <Circle
+
         center={position}
-        radius={500}
+
+        radius={searchRadius}
+
         pathOptions={{
           color: "blue",
           fillColor: "blue",
           fillOpacity: 0.05,
           weight: 2
         }}
+
       />
 
 
       {/* =================================================
           GASZONE
-          
+
           Alleen tonen wanneer actuele meteo beschikbaar is.
-          
-          Bij:
-          
-          weatherLoaded = false
-          
-          wordt de RiskArea helemaal niet geladen.
-          Daardoor kan de oude/onjuiste gasmal niet
-          zichtbaar zijn voordat de nieuwe meteo binnen is.
+
+          Bij weatherLoaded = false wordt RiskArea niet
+          geladen, zodat een oude gasmal niet zichtbaar
+          blijft voordat nieuwe meteo beschikbaar is.
           ================================================= */}
 
       {weatherLoaded && (
 
         <RiskArea
+
           latitude={latitude}
+
           longitude={longitude}
+
           windDirection={dispersionDirection}
+
           windSpeed={windSpeed}
+
           onZoneCreated={setGasZone}
+
         />
 
       )}
@@ -192,19 +237,25 @@ function MapView({
 
       {/* =================================================
           KWETSBARE OBJECTEN
-          
+
           De objecten worden door App.tsx opgehaald.
-          MapView doet zelf geen API-call meer.
+          MapView doet zelf geen API-call.
           ================================================= */}
 
       <VulnerableObjects
+
         latitude={latitude}
+
         longitude={longitude}
+
         gasZone={gasZone}
+
         objects={objects}
+
       />
 
     </MapContainer>
+
   );
 }
 
