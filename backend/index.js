@@ -41,6 +41,7 @@ app.get("/api/vulnerable-objects", async (req, res) => {
   const longitude = Number(req.query.longitude);
   const radius = Number(req.query.radius || 500);
 
+
   console.log("");
   console.log("======================================");
   console.log("🔎 Kwetsbare objecten opvragen");
@@ -71,19 +72,23 @@ app.get("/api/vulnerable-objects", async (req, res) => {
   // OVERPASS QUERY
   // ==================================================
   //
-  // We zoeken uitsluitend naar relevante objecten.
+  // Alleen relevante objecten voor de omgevingsscan.
   //
-  // BELANGRIJK:
-  // Geen algemene shop-query.
-  //
-  // Zorg:
+  // ZORG:
   // - ziekenhuizen
   // - klinieken
-  // - healthcare
-  // - alle social_facility
+  // - verpleeghuizen
+  // - woonzorg
   //
-  // Hierdoor worden ook woonzorgcentra en
-  // verpleeghuizen gevonden die anders getagd zijn.
+  // GEEN algemene healthcare-query.
+  //
+  // Hierdoor worden bijvoorbeeld:
+  // - tandartsen
+  // - psychologen
+  // - prothesepraktijken
+  // - fysiotherapeuten
+  //
+  // NIET meer automatisch meegenomen.
   // ==================================================
 
   const query = `
@@ -91,59 +96,104 @@ app.get("/api/vulnerable-objects", async (req, res) => {
 
 (
   // ================================================
-  // ZORG
+  // ZIEKENHUIZEN
   // ================================================
 
-  nwr["amenity"="hospital"](around:${radius},${latitude},${longitude});
-
-  nwr["amenity"="clinic"](around:${radius},${latitude},${longitude});
-
-  nwr["healthcare"](around:${radius},${latitude},${longitude});
-
-  nwr["social_facility"](around:${radius},${latitude},${longitude});
+  nwr["amenity"="hospital"]
+    (around:${radius},${latitude},${longitude});
 
 
   // ================================================
-  // ONDERWIJS
+  // KLINIEKEN
   // ================================================
 
-  nwr["amenity"="school"](around:${radius},${latitude},${longitude});
+  nwr["amenity"="clinic"]
+    (around:${radius},${latitude},${longitude});
 
-  nwr["amenity"="kindergarten"](around:${radius},${latitude},${longitude});
 
-  nwr["amenity"="childcare"](around:${radius},${latitude},${longitude});
+  // ================================================
+  // VERPLEEGHUIZEN
+  // ================================================
+
+  nwr["social_facility"="nursing_home"]
+    (around:${radius},${latitude},${longitude});
+
+
+  // ================================================
+  // WOONZORG / VERZORGD WONEN
+  // ================================================
+
+  nwr["social_facility"="care_home"]
+    (around:${radius},${latitude},${longitude});
+
+  nwr["social_facility"="assisted_living"]
+    (around:${radius},${latitude},${longitude});
+
+  nwr["social_facility"="retirement_home"]
+    (around:${radius},${latitude},${longitude});
+
+  nwr["social_facility"="group_home"]
+    (around:${radius},${latitude},${longitude});
+
+
+  // ================================================
+  // SCHOLEN
+  // ================================================
+
+  nwr["amenity"="school"]
+    (around:${radius},${latitude},${longitude});
+
+
+  // ================================================
+  // KINDEROPVANG
+  // ================================================
+
+  nwr["amenity"="kindergarten"]
+    (around:${radius},${latitude},${longitude});
+
+  nwr["amenity"="childcare"]
+    (around:${radius},${latitude},${longitude});
 
 
   // ================================================
   // RELIGIE
   // ================================================
 
-  nwr["amenity"="place_of_worship"](around:${radius},${latitude},${longitude});
+  nwr["amenity"="place_of_worship"]
+    (around:${radius},${latitude},${longitude});
 
 
   // ================================================
   // MAATSCHAPPELIJK
   // ================================================
 
-  nwr["amenity"="community_centre"](around:${radius},${latitude},${longitude});
+  nwr["amenity"="community_centre"]
+    (around:${radius},${latitude},${longitude});
 
 
   // ================================================
-  // BELANGRIJKE WINKELS
-  //
-  // Alleen supermarkten.
+  // SUPERMARKTEN
   // ================================================
 
-  nwr["shop"="supermarket"](around:${radius},${latitude},${longitude});
+  nwr["shop"="supermarket"]
+    (around:${radius},${latitude},${longitude});
 
 
   // ================================================
   // WINKELCENTRA
   // ================================================
 
-  nwr["shop"="mall"](around:${radius},${latitude},${longitude});
+  nwr["shop"="mall"]
+    (around:${radius},${latitude},${longitude});
 
-  nwr["amenity"="marketplace"](around:${radius},${latitude},${longitude});
+
+  // ================================================
+  // MARKTEN
+  // ================================================
+
+  nwr["amenity"="marketplace"]
+    (around:${radius},${latitude},${longitude});
+
 );
 
 out center tags;
@@ -164,6 +214,7 @@ out center tags;
 
       console.log("🌍 Overpass:", server);
 
+
       const response = await fetch(
         server,
         {
@@ -176,7 +227,7 @@ out center tags;
 
           body: query,
 
-          signal: AbortSignal.timeout(20000),
+          signal: AbortSignal.timeout(60000),
         }
       );
 
@@ -209,6 +260,7 @@ out center tags;
 
 
       break;
+
 
     } catch (error) {
 
@@ -249,7 +301,9 @@ out center tags;
   // ==================================================
 
   const objects = data.elements
+
     .map((el) => {
+
 
       // ----------------------------------------------
       // COÖRDINATEN
@@ -258,6 +312,7 @@ out center tags;
       const lat =
         el.lat ??
         el.center?.lat;
+
 
       const lon =
         el.lon ??
@@ -327,10 +382,6 @@ out center tags;
       // ==================================================
       // VERPLEEGHUIS / WOONZORG
       // ==================================================
-      //
-      // Verschillende OSM-waarden worden als
-      // nursing_home behandeld.
-      // ==================================================
 
       else if (
         tags.social_facility === "nursing_home" ||
@@ -341,20 +392,6 @@ out center tags;
       ) {
 
         type = "nursing_home";
-
-      }
-
-
-      // ==================================================
-      // ZORG
-      // ==================================================
-
-      else if (
-        tags.healthcare ||
-        tags.social_facility
-      ) {
-
-        type = "care";
 
       }
 
@@ -400,7 +437,7 @@ out center tags;
 
 
       // ==================================================
-      // SUPERMARKT
+      // SUPERMARKET
       // ==================================================
 
       else if (
@@ -463,7 +500,7 @@ out center tags;
 
 
       // ==================================================
-      // ALLEEN BENOEMDE WINKELS/WINKELCENTRA/MARKTEN
+      // NAAMLOZE OBJECTEN
       // ==================================================
 
       if (
@@ -501,65 +538,18 @@ out center tags;
       };
 
     })
+
     .filter(Boolean);
-
-
-  // ==================================================
-  // FILTEREN
-  // ==================================================
-
-  const filteredObjects =
-    objects.filter(
-      (object) => {
-
-        // ----------------------------------------------
-        // Naamloze winkelcentra verwijderen
-        // ----------------------------------------------
-
-        if (
-          object.type === "shopping_centre" &&
-          object.name === "Onbekend object"
-        ) {
-
-          return false;
-
-        }
-
-
-        // ----------------------------------------------
-        // Naamloze markten verwijderen
-        // ----------------------------------------------
-
-        if (
-          object.type === "marketplace" &&
-          object.name === "Onbekend object"
-        ) {
-
-          return false;
-
-        }
-
-
-        return true;
-
-      }
-    );
 
 
   // ==================================================
   // DUBBELE OBJECTEN VERWIJDEREN
   // ==================================================
-  //
-  // Hetzelfde object kan in OSM bijvoorbeeld als node
-  // én way voorkomen.
-  //
-  // Voor dezelfde naam + type houden we één object.
-  // ==================================================
 
   const uniqueObjects =
     Array.from(
       new Map(
-        filteredObjects.map(
+        objects.map(
           (object) => {
 
             const key =
@@ -588,7 +578,7 @@ out center tags;
 
     nursing_home: 2,
 
-    care: 3,
+    clinic: 3,
 
     school: 4,
 
@@ -641,16 +631,16 @@ out center tags;
   );
 
   console.log(
-    "👵 Verpleeghuizen:",
+    "🏥 Klinieken:",
     uniqueObjects.filter(
-      o => o.type === "nursing_home"
+      o => o.type === "clinic"
     ).length
   );
 
   console.log(
-    "♿ Zorg:",
+    "👵 Verpleeghuizen:",
     uniqueObjects.filter(
-      o => o.type === "care"
+      o => o.type === "nursing_home"
     ).length
   );
 
