@@ -72,56 +72,41 @@ app.get("/api/vulnerable-objects", async (req, res) => {
   // OVERPASS QUERY
   // ==================================================
   //
-  // Alleen relevante objecten voor de omgevingsscan.
+  // We zoeken bewust op meerdere OSM-tags.
   //
-  // ZORG:
-  // - ziekenhuizen
-  // - klinieken
-  // - verpleeghuizen
-  // - woonzorg
+  // Belangrijk:
   //
-  // GEEN algemene healthcare-query.
+  // Een school kan in OSM bijvoorbeeld zijn geregistreerd
+  // als:
   //
-  // Hierdoor worden bijvoorbeeld:
-  // - tandartsen
-  // - psychologen
-  // - prothesepraktijken
-  // - fysiotherapeuten
+  // amenity=school
   //
-  // NIET meer automatisch meegenomen.
+  // maar ook uitsluitend als:
+  //
+  // building=school
+  //
+  // Dollard College Pontis Winschoten is hiervan een
+  // voorbeeld.
+  //
+  // Daarom zoeken we beide.
   // ==================================================
 
   const query = `
-[out:json][timeout:15];
+[out:json][timeout:20];
 
 (
-  // ================================================
-  // ZIEKENHUIZEN
-  // ================================================
+  // ==================================================
+  // ZORG
+  // ==================================================
 
   nwr["amenity"="hospital"]
     (around:${radius},${latitude},${longitude});
 
-
-  // ================================================
-  // KLINIEKEN
-  // ================================================
-
   nwr["amenity"="clinic"]
     (around:${radius},${latitude},${longitude});
 
-
-  // ================================================
-  // VERPLEEGHUIZEN
-  // ================================================
-
   nwr["social_facility"="nursing_home"]
     (around:${radius},${latitude},${longitude});
-
-
-  // ================================================
-  // WOONZORG / VERZORGD WONEN
-  // ================================================
 
   nwr["social_facility"="care_home"]
     (around:${radius},${latitude},${longitude});
@@ -132,21 +117,36 @@ app.get("/api/vulnerable-objects", async (req, res) => {
   nwr["social_facility"="retirement_home"]
     (around:${radius},${latitude},${longitude});
 
-  nwr["social_facility"="group_home"]
-    (around:${radius},${latitude},${longitude});
 
-
-  // ================================================
-  // SCHOLEN
-  // ================================================
+  // ==================================================
+  // ONDERWIJS
+  // ==================================================
 
   nwr["amenity"="school"]
     (around:${radius},${latitude},${longitude});
 
+  nwr["building"="school"]
+    (around:${radius},${latitude},${longitude});
 
-  // ================================================
+  nwr["amenity"="college"]
+    (around:${radius},${latitude},${longitude});
+
+  nwr["building"="college"]
+    (around:${radius},${latitude},${longitude});
+
+  nwr["amenity"="university"]
+    (around:${radius},${latitude},${longitude});
+
+  nwr["building"="university"]
+    (around:${radius},${latitude},${longitude});
+
+  nwr["landuse"="education"]
+    (around:${radius},${latitude},${longitude});
+
+
+  // ==================================================
   // KINDEROPVANG
-  // ================================================
+  // ==================================================
 
   nwr["amenity"="kindergarten"]
     (around:${radius},${latitude},${longitude});
@@ -155,41 +155,36 @@ app.get("/api/vulnerable-objects", async (req, res) => {
     (around:${radius},${latitude},${longitude});
 
 
-  // ================================================
+  // ==================================================
   // RELIGIE
-  // ================================================
+  // ==================================================
 
   nwr["amenity"="place_of_worship"]
     (around:${radius},${latitude},${longitude});
 
 
-  // ================================================
+  // ==================================================
   // MAATSCHAPPELIJK
-  // ================================================
+  // ==================================================
 
   nwr["amenity"="community_centre"]
     (around:${radius},${latitude},${longitude});
 
 
-  // ================================================
+  // ==================================================
   // SUPERMARKTEN
-  // ================================================
+  // ==================================================
 
   nwr["shop"="supermarket"]
     (around:${radius},${latitude},${longitude});
 
 
-  // ================================================
-  // WINKELCENTRA
-  // ================================================
+  // ==================================================
+  // WINKELCENTRA / MARKTEN
+  // ==================================================
 
   nwr["shop"="mall"]
     (around:${radius},${latitude},${longitude});
-
-
-  // ================================================
-  // MARKTEN
-  // ================================================
 
   nwr["amenity"="marketplace"]
     (around:${radius},${latitude},${longitude});
@@ -227,7 +222,7 @@ out center tags;
 
           body: query,
 
-          signal: AbortSignal.timeout(60000),
+          signal: AbortSignal.timeout(25000),
         }
       );
 
@@ -260,7 +255,6 @@ out center tags;
 
 
       break;
-
 
     } catch (error) {
 
@@ -301,18 +295,15 @@ out center tags;
   // ==================================================
 
   const objects = data.elements
-
     .map((el) => {
 
-
-      // ----------------------------------------------
+      // ==================================================
       // COÖRDINATEN
-      // ----------------------------------------------
+      // ==================================================
 
       const lat =
         el.lat ??
         el.center?.lat;
-
 
       const lon =
         el.lon ??
@@ -329,26 +320,26 @@ out center tags;
       }
 
 
-      // ----------------------------------------------
+      // ==================================================
       // TAGS
-      // ----------------------------------------------
+      // ==================================================
 
       const tags = el.tags || {};
 
 
-      // ----------------------------------------------
+      // ==================================================
       // NAAM
-      // ----------------------------------------------
+      // ==================================================
 
       const name =
         tags.name ||
         tags["name:nl"] ||
-        null;
+        "Onbekend object";
 
 
-      // ----------------------------------------------
+      // ==================================================
       // TYPE
-      // ----------------------------------------------
+      // ==================================================
 
       let type = null;
 
@@ -387,8 +378,7 @@ out center tags;
         tags.social_facility === "nursing_home" ||
         tags.social_facility === "care_home" ||
         tags.social_facility === "assisted_living" ||
-        tags.social_facility === "retirement_home" ||
-        tags.social_facility === "group_home"
+        tags.social_facility === "retirement_home"
       ) {
 
         type = "nursing_home";
@@ -399,9 +389,62 @@ out center tags;
       // ==================================================
       // SCHOOL
       // ==================================================
+      //
+      // Zowel:
+      //
+      // amenity=school
+      //
+      // als:
+      //
+      // building=school
+      //
+      // worden als school behandeld.
+      // ==================================================
 
       else if (
-        tags.amenity === "school"
+        tags.amenity === "school" ||
+        tags.building === "school"
+      ) {
+
+        type = "school";
+
+      }
+
+
+      // ==================================================
+      // COLLEGE
+      // ==================================================
+
+      else if (
+        tags.amenity === "college" ||
+        tags.building === "college"
+      ) {
+
+        type = "school";
+
+      }
+
+
+      // ==================================================
+      // UNIVERSITEIT
+      // ==================================================
+
+      else if (
+        tags.amenity === "university" ||
+        tags.building === "university"
+      ) {
+
+        type = "school";
+
+      }
+
+
+      // ==================================================
+      // ONDERWIJSTERREIN
+      // ==================================================
+
+      else if (
+        tags.landuse === "education"
       ) {
 
         type = "school";
@@ -437,7 +480,20 @@ out center tags;
 
 
       // ==================================================
-      // SUPERMARKET
+      // MAATSCHAPPELIJK
+      // ==================================================
+
+      else if (
+        tags.amenity === "community_centre"
+      ) {
+
+        type = "community";
+
+      }
+
+
+      // ==================================================
+      // SUPERMARKT
       // ==================================================
 
       else if (
@@ -454,7 +510,8 @@ out center tags;
       // ==================================================
 
       else if (
-        tags.shop === "mall"
+        tags.shop === "mall" ||
+        tags.amenity === "marketplace"
       ) {
 
         type = "shopping_centre";
@@ -463,33 +520,7 @@ out center tags;
 
 
       // ==================================================
-      // MARKT
-      // ==================================================
-
-      else if (
-        tags.amenity === "marketplace"
-      ) {
-
-        type = "marketplace";
-
-      }
-
-
-      // ==================================================
-      // MAATSCHAPPELIJK
-      // ==================================================
-
-      else if (
-        tags.amenity === "community_centre"
-      ) {
-
-        type = "community";
-
-      }
-
-
-      // ==================================================
-      // ONBEKEND TYPE
+      // NIET RELEVANT
       // ==================================================
 
       if (!type) {
@@ -500,24 +531,7 @@ out center tags;
 
 
       // ==================================================
-      // NAAMLOZE OBJECTEN
-      // ==================================================
-
-      if (
-        (
-          type === "shopping_centre" ||
-          type === "marketplace"
-        ) &&
-        !name
-      ) {
-
-        return null;
-
-      }
-
-
-      // ==================================================
-      // RESULTAAT
+      // OBJECT TERUGGEVEN
       // ==================================================
 
       return {
@@ -525,9 +539,7 @@ out center tags;
         id:
           `${el.type}-${el.id}`,
 
-        name:
-          name ||
-          "Onbekend object",
+        name,
 
         type,
 
@@ -545,157 +557,67 @@ out center tags;
   // ==================================================
   // DUBBELE OBJECTEN VERWIJDEREN
   // ==================================================
+  //
+  // Hetzelfde OSM-object kan door meerdere queries
+  // worden gevonden.
+  //
+  // Bijvoorbeeld een object dat zowel:
+  //
+  // amenity=school
+  //
+  // als:
+  //
+  // building=school
+  //
+  // heeft.
+  //
+  // Het OSM-ID blijft hetzelfde, dus we houden slechts
+  // één exemplaar over.
+  // ==================================================
 
   const uniqueObjects =
     Array.from(
       new Map(
         objects.map(
-          (object) => {
-
-            const key =
-              `${object.type}-${object.name
-                .trim()
-                .toLowerCase()}`;
-
-            return [
-              key,
-              object
-            ];
-
-          }
+          (object) => [
+            object.id,
+            object,
+          ]
         )
       ).values()
     );
 
 
   // ==================================================
-  // PRIORITEIT
+  // RESULTAAT SORTEREN
   // ==================================================
-
-  const priority = {
-
-    hospital: 1,
-
-    nursing_home: 2,
-
-    clinic: 3,
-
-    school: 4,
-
-    kindergarten: 5,
-
-    church: 6,
-
-    community: 7,
-
-    supermarket: 8,
-
-    shopping_centre: 9,
-
-    marketplace: 10,
-
-  };
-
-
-  // ==================================================
-  // SORTEREN
+  //
+  // Eerst alfabetisch op naam.
   // ==================================================
 
   uniqueObjects.sort(
     (a, b) =>
-      (priority[a.type] || 99) -
-      (priority[b.type] || 99)
+      a.name.localeCompare(
+        b.name,
+        "nl",
+        {
+          sensitivity: "base",
+        }
+      )
   );
 
 
-  // ==================================================
-  // LOGGING
-  // ==================================================
-
-  console.log("");
-
   console.log(
-    "======================================"
-  );
-
-  console.log(
-    "✅ Definitieve objecten:",
+    "🟢 Unieke relevante objecten:",
     uniqueObjects.length
   );
 
-  console.log(
-    "🏥 Ziekenhuizen:",
-    uniqueObjects.filter(
-      o => o.type === "hospital"
-    ).length
-  );
-
-  console.log(
-    "🏥 Klinieken:",
-    uniqueObjects.filter(
-      o => o.type === "clinic"
-    ).length
-  );
-
-  console.log(
-    "👵 Verpleeghuizen:",
-    uniqueObjects.filter(
-      o => o.type === "nursing_home"
-    ).length
-  );
-
-  console.log(
-    "🏫 Scholen:",
-    uniqueObjects.filter(
-      o => o.type === "school"
-    ).length
-  );
-
-  console.log(
-    "👶 Kinderopvang:",
-    uniqueObjects.filter(
-      o => o.type === "kindergarten"
-    ).length
-  );
-
-  console.log(
-    "⛪ Kerken:",
-    uniqueObjects.filter(
-      o => o.type === "church"
-    ).length
-  );
-
-  console.log(
-    "🏢 Maatschappelijk:",
-    uniqueObjects.filter(
-      o => o.type === "community"
-    ).length
-  );
-
-  console.log(
-    "🛒 Supermarkten:",
-    uniqueObjects.filter(
-      o => o.type === "supermarket"
-    ).length
-  );
-
-  console.log(
-    "🏬 Winkelcentra:",
-    uniqueObjects.filter(
-      o => o.type === "shopping_centre"
-    ).length
-  );
-
-  console.log(
-    "======================================"
-  );
-
 
   // ==================================================
-  // ANTWOORD
+  // RESULTAAT
   // ==================================================
 
-  return res.json(
+  return res.status(200).json(
     uniqueObjects
   );
 
@@ -703,24 +625,22 @@ out center tags;
 
 
 // ==================================================
-// LOKALE SERVER
+// SERVER STARTEN
 // ==================================================
 
-if (require.main === module) {
+app.listen(
+  PORT,
+  () => {
 
-  app.listen(
-    PORT,
-    "0.0.0.0",
-    () => {
+    console.log("");
+    console.log("======================================");
+    console.log("🚒 Omgevingsscan backend");
+    console.log(`🚀 Server draait op poort ${PORT}`);
+    console.log("======================================");
+    console.log("");
 
-      console.log(
-        `🚒 Omgevingsscan backend draait op poort ${PORT}`
-      );
-
-    }
-  );
-
-}
+  }
+);
 
 
 // ==================================================

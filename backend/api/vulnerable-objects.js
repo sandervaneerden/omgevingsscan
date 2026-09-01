@@ -52,6 +52,60 @@ function normalizeName(name) {
 
 
 // ============================================================
+// AFSTAND BEREKENEN
+// ============================================================
+//
+// Haversine-formule.
+// Wordt gebruikt om te bepalen of twee objecten met dezelfde
+// naam daadwerkelijk duplicaten zijn.
+// ============================================================
+
+function distanceInMeters(
+  latitude1,
+  longitude1,
+  latitude2,
+  longitude2
+) {
+
+  const earthRadius = 6371000;
+
+  const toRadians =
+    value => value * Math.PI / 180;
+
+  const lat1 =
+    toRadians(latitude1);
+
+  const lat2 =
+    toRadians(latitude2);
+
+  const deltaLat =
+    toRadians(
+      latitude2 - latitude1
+    );
+
+  const deltaLon =
+    toRadians(
+      longitude2 - longitude1
+    );
+
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1) *
+    Math.cos(lat2) *
+    Math.sin(deltaLon / 2) ** 2;
+
+  const c =
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    );
+
+  return earthRadius * c;
+}
+
+
+// ============================================================
 // TYPE BEPALEN
 // ============================================================
 
@@ -104,9 +158,6 @@ function determineType(tags) {
 
   // ----------------------------------------------------------
   // SCHOOL
-  //
-  // We ondersteunen meerdere OSM-manieren om scholen
-  // te taggen.
   // ----------------------------------------------------------
 
   if (
@@ -146,9 +197,6 @@ function determineType(tags) {
 
   // ----------------------------------------------------------
   // SCHOOLGEBOUW
-  //
-  // Sommige OSM-objecten zijn alleen als gebouw=school
-  // vastgelegd.
   // ----------------------------------------------------------
 
   if (
@@ -172,9 +220,7 @@ function determineType(tags) {
 
 
   // ----------------------------------------------------------
-  // EDUCATION=* 
-  //
-  // Nieuwere OSM-tagging.
+  // EDUCATION=*
   // ----------------------------------------------------------
 
   if (
@@ -291,22 +337,18 @@ function buildQuery(
   // SCHOLEN
   // ==========================================================
 
-  // Klassieke OSM-tag
   nwr["amenity"="school"]
     (around:${radius},${latitude},${longitude});
 
-  // Nieuwe education-tag
   nwr["education"]
     (around:${radius},${latitude},${longitude});
 
-  // Hogere onderwijsinstellingen
   nwr["amenity"="college"]
     (around:${radius},${latitude},${longitude});
 
   nwr["amenity"="university"]
     (around:${radius},${latitude},${longitude});
 
-  // Schoolgebouwen
   nwr["building"="school"]
     (around:${radius},${latitude},${longitude});
 
@@ -316,7 +358,6 @@ function buildQuery(
   nwr["building"="university"]
     (around:${radius},${latitude},${longitude});
 
-  // Onderwijsterreinen
   nwr["landuse"="education"]
     (around:${radius},${latitude},${longitude});
 
@@ -402,7 +443,6 @@ async function fetchFromOverpass(query) {
 
           body: query,
 
-          // Per server maximaal 30 seconden.
           signal: AbortSignal.timeout(30000),
         }
       );
@@ -677,14 +717,8 @@ async function handler(req, res) {
 
 
     // --------------------------------------------------------
-    // Schoolgebouwen zonder naam
-    //
-    // Alleen een los gebouw=school zonder naam kan een
-    // duplicaat zijn van de daadwerkelijke school.
-    // We nemen ze wel mee; hieronder worden dubbele objecten
-    // zoveel mogelijk verwijderd.
+    // Object toevoegen
     // --------------------------------------------------------
-
 
     objects.push({
 
@@ -708,22 +742,26 @@ async function handler(req, res) {
 
 
   // ==========================================================
-  // DUBBELE OBJECTEN
+  // DUBBELE OBJECTEN FILTEREN
   // ==========================================================
   //
-  // Eén school kan bijvoorbeeld als:
+  // We verwijderen niet meer simpelweg alle objecten met
+  // dezelfde naam.
   //
-  // - node
-  // - way
-  // - building
+  // Eén organisatie kan namelijk meerdere locaties hebben.
   //
-  // in OSM voorkomen.
+  // Een object wordt alleen als duplicaat gezien wanneer:
   //
-  // We proberen dubbele namen te verwijderen.
+  // - type hetzelfde is
+  // - naam hetzelfde is
+  // - afstand maximaal 100 meter is
+  //
+  // Daardoor kunnen bijvoorbeeld twee verschillende
+  // vestigingen van Dollard College gewoon naast elkaar
+  // blijven bestaan.
   // ==========================================================
 
-  const uniqueByName =
-    new Map();
+  const uniqueObjects = [];
 
 
   for (const object of objects) {
@@ -734,14 +772,38 @@ async function handler(req, res) {
       );
 
 
-    // Naamloze objecten niet samenvoegen.
+    // --------------------------------------------------------
+    // Naamloze schoolgebouwen niet zelfstandig tonen
+    // --------------------------------------------------------
+    //
+    // Dit voorkomt dat allerlei losse BAG-schoolgebouwen
+    // als aparte scholen op de kaart verschijnen.
+    //
+    // Een school met een naam blijft uiteraard behouden.
+    // --------------------------------------------------------
+
+    if (
+      object.type === "school" &&
+      (
+        !normalized ||
+        normalized === "onbekend object"
+      )
+    ) {
+
+      continue;
+    }
+
+
+    // --------------------------------------------------------
+    // Naamloze overige objecten behouden
+    // --------------------------------------------------------
+
     if (
       !normalized ||
       normalized === "onbekend object"
     ) {
 
-      uniqueByName.set(
-        object.id,
+      uniqueObjects.push(
         object
       );
 
@@ -749,43 +811,68 @@ async function handler(req, res) {
     }
 
 
-    const key =
-      `${object.type}:${normalized}`;
+    // --------------------------------------------------------
+    // Controleren op bestaand duplicaat
+    // --------------------------------------------------------
+
+    const duplicate =
+      uniqueObjects.find(
+        existing => {
+
+          // Ander type = geen duplicaat
+          if (
+            existing.type !== object.type
+          ) {
+
+            return false;
+          }
 
 
-    // Eerste object behouden.
-    if (
-      !uniqueByName.has(key)
-    ) {
+          // Andere naam = geen duplicaat
+          if (
+            normalizeName(
+              existing.name
+            ) !== normalized
+          ) {
 
-      uniqueByName.set(
-        key,
-        object
+            return false;
+          }
+
+
+          // Afstand bepalen
+          const distance =
+            distanceInMeters(
+              existing.latitude,
+              existing.longitude,
+              object.latitude,
+              object.longitude
+            );
+
+
+          // Alleen binnen 100 meter als duplicaat
+          return distance <= 100;
+        }
       );
+
+
+    // --------------------------------------------------------
+    // Duplicaat gevonden
+    // --------------------------------------------------------
+
+    if (duplicate) {
+
+      continue;
     }
-  }
 
 
-  let uniqueObjects =
-    Array.from(
-      uniqueByName.values()
+    // --------------------------------------------------------
+    // Nieuw uniek object
+    // --------------------------------------------------------
+
+    uniqueObjects.push(
+      object
     );
-
-
-  // ==========================================================
-  // EXTRA FILTER
-  // ==========================================================
-  //
-  // Losse schoolgebouwen zonder naam kunnen veel
-  // bijgebouwen opleveren. Als er geen naam aanwezig is,
-  // behouden we ze alleen wanneer ze rechtstreeks als
-  // schoolterrein/onderwijsvoorziening zijn gemapt.
-  //
-  // Omdat de oorspronkelijke tags hier niet meer beschikbaar
-  // zijn, laten we de objecten voorlopig staan.
-  //
-  // Dit voorkomt dat echte scholen verloren gaan.
-  // ==========================================================
+  }
 
 
   // ==========================================================
