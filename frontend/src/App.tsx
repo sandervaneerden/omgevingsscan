@@ -40,6 +40,7 @@ type Category =
   | "Religie"
   | "Winkels"
   | "Maatschappelijk"
+  | "Verblijf"
   | "Overig";
 
 
@@ -157,6 +158,7 @@ function categoryForType(
     case "psychologist":
       return "Zorg";
 
+
     case "school":
     case "kindergarten":
     case "college":
@@ -164,11 +166,13 @@ function categoryForType(
     case "childcare":
       return "Onderwijs";
 
+
     case "church":
     case "place_of_worship":
     case "mosque":
     case "synagogue":
       return "Religie";
+
 
     case "shop":
     case "supermarket":
@@ -178,9 +182,15 @@ function categoryForType(
     case "hardware_store":
       return "Winkels";
 
+
     case "community":
     case "community_centre":
       return "Maatschappelijk";
+
+
+    case "hotel":
+      return "Verblijf";
+
 
     default:
       return "Overig";
@@ -234,6 +244,7 @@ function objectTypeName(
     case "psychologist":
       return "Psycholoog";
 
+
     case "school":
       return "School";
 
@@ -249,6 +260,7 @@ function objectTypeName(
     case "university":
       return "Universiteit";
 
+
     case "church":
       return "Kerk";
 
@@ -260,6 +272,7 @@ function objectTypeName(
 
     case "synagogue":
       return "Synagoge";
+
 
     case "supermarket":
       return "Supermarkt";
@@ -279,11 +292,17 @@ function objectTypeName(
     case "shop":
       return "Winkel";
 
+
     case "community":
       return "Maatschappelijke instelling";
 
     case "community_centre":
       return "Buurt- / wijkcentrum";
+
+
+    case "hotel":
+      return "Hotel";
+
 
     default:
       return "Overig";
@@ -293,7 +312,6 @@ function objectTypeName(
 
 /* =========================================================
    SVG ICOON VOOR OBJECT
-   Zelfde stijl als op de kaart
    ========================================================= */
 
 function iconForType(
@@ -384,7 +402,7 @@ function iconForType(
 
 
     /* =====================================================
-       HUISARTS / TANDARTS / APOTHEEK
+       HUISARTS
        ===================================================== */
 
     case "doctors":
@@ -427,6 +445,10 @@ function iconForType(
       `;
 
 
+    /* =====================================================
+       TANDARTS
+       ===================================================== */
+
     case "dentist":
 
       return `
@@ -449,6 +471,10 @@ function iconForType(
         </svg>
       `;
 
+
+    /* =====================================================
+       APOTHEEK
+       ===================================================== */
 
     case "pharmacy":
 
@@ -648,6 +674,70 @@ function iconForType(
 
 
     /* =====================================================
+       HOTEL / VERBLIJF
+       ===================================================== */
+
+    case "hotel":
+
+      return `
+        <svg
+          viewBox="0 0 32 32"
+          width="28"
+          height="28"
+        >
+          <rect
+            x="5"
+            y="5"
+            width="22"
+            height="22"
+            rx="2"
+            fill="#00838f"
+          />
+
+          <rect
+            x="9"
+            y="10"
+            width="4"
+            height="4"
+            fill="white"
+          />
+
+          <rect
+            x="19"
+            y="10"
+            width="4"
+            height="4"
+            fill="white"
+          />
+
+          <rect
+            x="9"
+            y="17"
+            width="4"
+            height="4"
+            fill="white"
+          />
+
+          <rect
+            x="19"
+            y="17"
+            width="4"
+            height="4"
+            fill="white"
+          />
+
+          <rect
+            x="14"
+            y="20"
+            width="4"
+            height="7"
+            fill="white"
+          />
+        </svg>
+      `;
+
+
+    /* =====================================================
        OVERIG
        ===================================================== */
 
@@ -703,6 +793,9 @@ function categoryIcon(
     case "Maatschappelijk":
       return "🏢";
 
+    case "Verblijf":
+      return "🏨";
+
     case "Overig":
       return "📍";
   }
@@ -719,6 +812,7 @@ const categoryOrder: Category[] = [
   "Religie",
   "Winkels",
   "Maatschappelijk",
+  "Verblijf",
   "Overig",
 ];
 
@@ -781,11 +875,6 @@ function App() {
 
   /* =======================================================
      INGEKLAPTE CATEGORIEËN
-     
-     true = ingeklapt
-     false = open
-     
-     Standaard staan alle categorieën ingeklapt.
      ======================================================= */
 
   const [
@@ -797,6 +886,7 @@ function App() {
     Religie: true,
     Winkels: true,
     Maatschappelijk: true,
+    Verblijf: true,
     Overig: true,
   });
 
@@ -810,7 +900,7 @@ function App() {
   ) {
 
     setCollapsedCategories(
-      (previous) => ({
+      previous => ({
         ...previous,
         [category]: !previous[category],
       })
@@ -928,10 +1018,6 @@ function App() {
     setLocation(locationData);
 
 
-    /* -----------------------------------------------------
-       OUDE DATA WISSEN
-       ----------------------------------------------------- */
-
     setWeather(null);
 
     setObjects([]);
@@ -1000,7 +1086,7 @@ function App() {
 
   const visibleObjects =
     objects.filter(
-      (object) => {
+      object => {
 
         const name =
           object.name
@@ -1054,7 +1140,7 @@ function App() {
 
 
         /* ---------------------------------------------------
-           GASZONE NOG NIET BESCHIKBAAR
+           GASZONE
            --------------------------------------------------- */
 
         if (
@@ -1064,10 +1150,6 @@ function App() {
           return false;
         }
 
-
-        /* ---------------------------------------------------
-           GASZONE
-           --------------------------------------------------- */
 
         return pointInPolygon(
           object.latitude,
@@ -1125,10 +1207,6 @@ function App() {
   return (
     <div className="app">
 
-      {/* ===================================================
-          HEADER
-          =================================================== */}
-
       <header className="header">
 
         <div className="header-inner">
@@ -1172,10 +1250,6 @@ function App() {
       </header>
 
 
-      {/* ===================================================
-          ZOEKPANEEL
-          =================================================== */}
-
       <section className="search-panel">
 
         <h2>
@@ -1191,16 +1265,7 @@ function App() {
       </section>
 
 
-      {/* ===================================================
-          DASHBOARD
-          =================================================== */}
-
       <main className="dashboard">
-
-
-        {/* =================================================
-            WEER
-            ================================================= */}
 
         <section className="panel weather-panel">
 
@@ -1214,10 +1279,6 @@ function App() {
 
         </section>
 
-
-        {/* =================================================
-            OBJECTEN
-            ================================================= */}
 
         <section className="panel objects-panel">
 
@@ -1272,7 +1333,7 @@ function App() {
             <div className="objects-list">
 
               {categoryOrder.map(
-                (category) => {
+                category => {
 
                   const categoryObjects =
                     groupedObjects[category];
@@ -1285,10 +1346,6 @@ function App() {
                     return null;
                   }
 
-
-                  /* -----------------------------------------
-                     SORTEREN OP AFSTAND
-                     ----------------------------------------- */
 
                   const sortedObjects =
                     [...categoryObjects].sort(
@@ -1330,10 +1387,6 @@ function App() {
                       key={category}
                     >
 
-                      {/* =================================
-                          CATEGORIEBALK
-                          ================================= */}
-
                       <button
                         type="button"
                         className="object-category-title"
@@ -1368,16 +1421,12 @@ function App() {
                       </button>
 
 
-                      {/* =================================
-                          OBJECTEN
-                          ================================= */}
-
                       {!isCollapsed && (
 
                         <div className="object-category-list">
 
                           {sortedObjects.map(
-                            (object) => {
+                            object => {
 
                               const distance =
                                 distanceInMeters(
@@ -1454,10 +1503,6 @@ function App() {
 
         </section>
 
-
-        {/* =================================================
-            KAART
-            ================================================= */}
 
         <section className="panel map-panel">
 

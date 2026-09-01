@@ -74,19 +74,13 @@ app.get("/api/vulnerable-objects", async (req, res) => {
   //
   // We zoeken bewust op meerdere OSM-tags.
   //
-  // Belangrijk:
-  //
-  // Een school kan in OSM bijvoorbeeld zijn geregistreerd
-  // als:
+  // Een school kan bijvoorbeeld geregistreerd zijn als:
   //
   // amenity=school
   //
   // maar ook uitsluitend als:
   //
   // building=school
-  //
-  // Dollard College Pontis Winschoten is hiervan een
-  // voorbeeld.
   //
   // Daarom zoeken we beide.
   // ==================================================
@@ -187,6 +181,14 @@ app.get("/api/vulnerable-objects", async (req, res) => {
     (around:${radius},${latitude},${longitude});
 
   nwr["amenity"="marketplace"]
+    (around:${radius},${latitude},${longitude});
+
+
+  // ==================================================
+  // HOTELS
+  // ==================================================
+
+  nwr["tourism"="hotel"]
     (around:${radius},${latitude},${longitude});
 
 );
@@ -330,27 +332,10 @@ out center tags;
       // ==================================================
       // NAAM
       // ==================================================
-      //
-      // Een aantal BAG-schoolgebouwen heeft geen
-      // naam in OpenStreetMap.
-      //
-      // Deze worden herkenbaar weergegeven als:
-      //
-      // Schoolgebouw (BAG)
-      //
-      // in plaats van:
-      //
-      // Onbekend object
-      // ==================================================
 
-      const name =
+      let name =
         tags.name ||
-        tags["name:nl"] ||
-        (
-          tags.building === "school"
-            ? "Schoolgebouw (BAG)"
-            : "Onbekend object"
-        );
+        tags["name:nl"];
 
 
       // ==================================================
@@ -536,12 +521,72 @@ out center tags;
 
 
       // ==================================================
+      // HOTEL
+      // ==================================================
+
+      else if (
+        tags.tourism === "hotel"
+      ) {
+
+        type = "hotel";
+
+      }
+
+
+      // ==================================================
       // NIET RELEVANT
       // ==================================================
 
       if (!type) {
 
         return null;
+
+      }
+
+
+      // ==================================================
+      // NAAMLOZE BAG-SCHOOLGEBOUWEN
+      // ==================================================
+      //
+      // Sommige BAG-objecten hebben wel:
+      //
+      // building=school
+      //
+      // maar geen naam.
+      //
+      // Deze tonen we niet meer als:
+      //
+      // "Onbekend object"
+      //
+      // maar als:
+      //
+      // "Schoolgebouw (BAG)"
+      //
+      // Zo blijft duidelijk wat voor object het is.
+      // ==================================================
+
+      if (
+        type === "school" &&
+        !name &&
+        tags.building === "school"
+      ) {
+
+        name = "Schoolgebouw (BAG)";
+
+      }
+
+
+      // ==================================================
+      // ALGEMENE NAAMLOZE OBJECTEN
+      // ==================================================
+      //
+      // Voor andere objecttypen gebruiken we een neutrale
+      // naam als OSM geen naam heeft.
+      // ==================================================
+
+      if (!name) {
+
+        name = "Onbekend object";
 
       }
 
@@ -608,7 +653,7 @@ out center tags;
   // RESULTAAT SORTEREN
   // ==================================================
   //
-  // Eerst alfabetisch op naam.
+  // Alfabetisch op naam.
   // ==================================================
 
   uniqueObjects.sort(

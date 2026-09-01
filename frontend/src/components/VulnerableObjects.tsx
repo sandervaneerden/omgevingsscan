@@ -103,10 +103,6 @@ function pointInGasZone(
 
 /* =========================================================
    VASTE SVG ICONEN
-   =========================================================
-   
-   De kleuren zijn gelijkgetrokken met de iconen
-   die in de lijst worden gebruikt.
    ========================================================= */
 
 function iconForType(type: string) {
@@ -136,10 +132,8 @@ function iconForType(type: string) {
 
   switch (type) {
 
-
     /* =====================================================
-       ZIEKENHUIS / KLINIEK
-       ROOD
+       ZIEKENHUIS
        ===================================================== */
 
     case "hospital":
@@ -185,7 +179,6 @@ function iconForType(type: string) {
 
     /* =====================================================
        ZORG
-       BLAUW
        ===================================================== */
 
     case "healthcare":
@@ -229,134 +222,7 @@ function iconForType(type: string) {
 
 
     /* =====================================================
-       HUISARTS
-       BLAUW
-       ===================================================== */
-
-    case "doctors":
-
-      icon = `
-        <svg
-          viewBox="0 0 32 32"
-          width="30"
-          height="30"
-        >
-
-          <circle
-            cx="16"
-            cy="16"
-            r="13"
-            fill="#1976d2"
-          />
-
-          <path
-            d="M11 10V17C11 20 13 22 16 22C19 22 21 20 21 17V10"
-            fill="none"
-            stroke="white"
-            stroke-width="2.5"
-            stroke-linecap="round"
-          />
-
-          <path
-            d="M11 10H15"
-            stroke="white"
-            stroke-width="2.5"
-            stroke-linecap="round"
-          />
-
-          <path
-            d="M17 10H21"
-            stroke="white"
-            stroke-width="2.5"
-            stroke-linecap="round"
-          />
-
-        </svg>
-      `;
-
-      break;
-
-
-    /* =====================================================
-       TANDARTS
-       BLAUW
-       ===================================================== */
-
-    case "dentist":
-
-      icon = `
-        <svg
-          viewBox="0 0 32 32"
-          width="30"
-          height="30"
-        >
-
-          <circle
-            cx="16"
-            cy="16"
-            r="13"
-            fill="#1976d2"
-          />
-
-          <path
-            d="M10 10C12 8 14 10 16 10C18 10 20 8 22 10C23 12 21 15 21 18C21 21 19 24 18 24C17 24 17 20 16 20C15 20 15 24 14 24C13 24 11 21 11 18C11 15 9 12 10 10Z"
-            fill="white"
-          />
-
-        </svg>
-      `;
-
-      break;
-
-
-    /* =====================================================
-       APOTHEEK
-       BLAUW
-       ===================================================== */
-
-    case "pharmacy":
-
-      icon = `
-        <svg
-          viewBox="0 0 32 32"
-          width="30"
-          height="30"
-        >
-
-          <circle
-            cx="16"
-            cy="16"
-            r="13"
-            fill="#1976d2"
-          />
-
-          <rect
-            x="10"
-            y="13"
-            width="12"
-            height="6"
-            rx="2"
-            fill="white"
-          />
-
-          <rect
-            x="13"
-            y="10"
-            width="6"
-            height="12"
-            rx="2"
-            fill="white"
-          />
-
-        </svg>
-      `;
-
-      break;
-
-
-    /* =====================================================
        ONDERWIJS
-       GEEL
        ===================================================== */
 
     case "school":
@@ -398,7 +264,6 @@ function iconForType(type: string) {
 
     /* =====================================================
        RELIGIE
-       PAARS
        ===================================================== */
 
     case "church":
@@ -449,7 +314,6 @@ function iconForType(type: string) {
 
     /* =====================================================
        WINKEL
-       ORANJE
        ===================================================== */
 
     case "shop":
@@ -495,7 +359,6 @@ function iconForType(type: string) {
 
     /* =====================================================
        MAATSCHAPPELIJK
-       GROEN
        ===================================================== */
 
     case "community":
@@ -537,7 +400,6 @@ function iconForType(type: string) {
 
     /* =====================================================
        HOTEL / VERBLIJF
-       TURQUOISE
        ===================================================== */
 
     case "hotel":
@@ -549,98 +411,52 @@ function iconForType(type: string) {
           height="30"
         >
 
-          <!-- hotelgebouw -->
-
           <rect
             x="5"
-            y="6"
+            y="5"
             width="22"
-            height="21"
+            height="22"
             rx="2"
-            fill="#00897b"
+            fill="#00838f"
           />
 
-          <!-- ramen -->
-
           <rect
-            x="8"
-            y="9"
-            width="5"
-            height="5"
-            rx="1"
+            x="9"
+            y="10"
+            width="4"
+            height="4"
             fill="white"
           />
 
           <rect
             x="19"
-            y="9"
-            width="5"
-            height="5"
-            rx="1"
-            fill="white"
-          />
-
-          <!-- bed -->
-
-          <rect
-            x="8"
-            y="18"
-            width="16"
-            height="7"
-            rx="1"
+            y="10"
+            width="4"
+            height="4"
             fill="white"
           />
 
           <rect
             x="9"
             y="17"
-            width="6"
+            width="4"
             height="4"
-            rx="1"
             fill="white"
           />
 
-          <!-- deur -->
+          <rect
+            x="19"
+            y="17"
+            width="4"
+            height="4"
+            fill="white"
+          />
 
           <rect
             x="14"
-            y="22"
+            y="20"
             width="4"
-            height="5"
-            fill="#00897b"
-          />
-
-        </svg>
-      `;
-
-      break;
-
-
-    /* =====================================================
-       OVERIG
-       GRIJS
-       ===================================================== */
-
-    default:
-
-      icon = `
-        <svg
-          viewBox="0 0 32 32"
-          width="30"
-          height="30"
-        >
-
-          <circle
-            cx="16"
-            cy="16"
-            r="11"
-            fill="#607d8b"
-          />
-
-          <circle
-            cx="16"
-            cy="16"
-            r="4"
+            height="7"
             fill="white"
           />
 
@@ -648,6 +464,7 @@ function iconForType(type: string) {
       `;
 
       break;
+
   }
 
 
@@ -693,7 +510,7 @@ export default function VulnerableObjects({
 
   /* =======================================================
      ALLEEN OBJECTEN BINNEN:
-
+     
      1. 500 meter cirkel
      OF
      2. GASZONE
@@ -774,7 +591,10 @@ export default function VulnerableObjects({
 
             <br />
 
-            {obj.type}
+            {obj.type === "hotel"
+              ? "Hotel"
+              : obj.type
+            }
 
           </Popup>
 
