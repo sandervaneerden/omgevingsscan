@@ -5,55 +5,214 @@ interface WeatherPanelProps {
   weather: WeatherResult | null;
 }
 
-function WeatherPanel({ weather }: WeatherPanelProps) {
+
+// =========================================================
+// WINDRICHTING MET GRADEN
+// =========================================================
+
+function getWindDirectionWithDegrees(
+  direction: string,
+  degrees: number
+): string {
+
+  if (!Number.isFinite(degrees)) {
+    return direction;
+  }
+
+  return `${direction} (${Math.round(degrees)}°)`;
+}
+
+
+// =========================================================
+// WEATHER PANEL
+// =========================================================
+
+function WeatherPanel({
+  weather
+}: WeatherPanelProps) {
+
+  // =======================================================
+  // GEEN WEERGEGEVENS
+  // =======================================================
+
   if (!weather) {
+
     return (
+
       <div className="weather">
-        <p>🌬 Wind: nog geen gegevens</p>
-        <p>🧭 Richting: --</p>
-        <p>💨 Windkracht: --</p>
-        <p>🌡 Temperatuur: --</p>
+
+        <p>
+          💨 Windkracht:{" "}
+          <strong>--</strong>
+        </p>
+
+        <p>
+          🌬 Windsnelheid:{" "}
+          <strong>--</strong>
+        </p>
+
+        <p>
+          🧭 Windrichting:{" "}
+          <strong>--</strong>
+        </p>
+
+        <p>
+          🌡 Temperatuur:{" "}
+          <strong>--</strong>
+        </p>
+
+        <p>
+          🕒 Meting:{" "}
+          <strong>--</strong>
+        </p>
+
       </div>
+
     );
   }
 
-  const windSpeedMs = weather.windSpeed / 3.6;
+
+  // =======================================================
+  // WINDSNELHEID
+  //
+  // weather.windSpeed komt binnen als km/u.
+  // =======================================================
+
+  const windSpeedKmh =
+    weather.windSpeed;
+
+  const windSpeedMs =
+    windSpeedKmh / 3.6;
+
+
+  // =======================================================
+  // WINDKRACHT
+  // =======================================================
+
+  const beaufort =
+    getBeaufort(
+      windSpeedKmh
+    );
+
+
+  // =======================================================
+  // WINDRICHTING
+  //
+  // De windrichting in graden komt uit de WeatherResult.
+  // =======================================================
+
+  const windDirectionDegrees =
+    Number(
+      weather.windDirection
+    );
+
+
+  const windDirection =
+    getWindDirectionWithDegrees(
+      weather.windDirectionText,
+      windDirectionDegrees
+    );
+
+
+  // =======================================================
+  // RENDER
+  // =======================================================
 
   return (
+
     <div className="weather">
 
-      <p>
-        🌬 Wind:{" "}
-        <strong>{weather.windSpeed.toFixed(1)} km/u</strong>{" "}
-        ({windSpeedMs.toFixed(1)} m/s)
-      </p>
+      {/* =================================================
+          WINDKRACHT
+          ================================================= */}
 
       <p>
-        🧭 Richting:{" "}
-        <strong>{weather.windDirectionText}</strong>
-      </p>
 
-      <p>
         💨 Windkracht:{" "}
-        <strong>{getBeaufort(weather.windSpeed)} Beaufort</strong>
+
+        <strong>
+          {beaufort} Beaufort
+        </strong>
+
       </p>
 
+
+      {/* =================================================
+          WINDSNELHEID
+          ================================================= */}
+
       <p>
+
+        🌬 Windsnelheid:{" "}
+
+        <strong>
+          {windSpeedKmh.toFixed(1)} km/u
+        </strong>{" "}
+
+        (
+        {windSpeedMs.toFixed(1)} m/s
+        )
+
+      </p>
+
+
+      {/* =================================================
+          WINDRICHTING
+          ================================================= */}
+
+      <p>
+
+        🧭 Windrichting:{" "}
+
+        <strong>
+          {windDirection}
+        </strong>
+
+      </p>
+
+
+      {/* =================================================
+          TEMPERATUUR
+          ================================================= */}
+
+      <p>
+
         🌡 Temperatuur:{" "}
-        <strong>{weather.temperature} °C</strong>
+
+        <strong>
+          {weather.temperature} °C
+        </strong>
+
       </p>
 
+
+      {/* =================================================
+          MEETTIJD
+          ================================================= */}
+
       <p>
+
         🕒 Meting:{" "}
-        <strong>{weather.measurementTime}</strong>
+
+        <strong>
+          {weather.measurementTime}
+        </strong>
+
       </p>
+
+
+      {/* =================================================
+          BRON
+          ================================================= */}
 
       <small>
         Bron: Open-Meteo
       </small>
 
     </div>
+
   );
 }
+
 
 export default WeatherPanel;

@@ -1,6 +1,6 @@
-/* =========================
+/* =========================================================
    BASIS
-   ========================= */
+   ========================================================= */
 
 .app {
   min-height: 100vh;
@@ -9,206 +9,264 @@
 }
 
 
-/* =========================
+/* =========================================================
    HEADER
-   ========================= */
+   ========================================================= */
 
 .header {
-  background: #0d141c;
-  border-bottom: 1px solid #202b36;
+  position: relative;
+  width: 100%;
+  background:
+    linear-gradient(
+      135deg,
+      #111820 0%,
+      #18232d 55%,
+      #202d38 100%
+    );
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
 
-  padding: 24px 40px;
-
+.header-inner {
+  max-width: 1280px;
+  min-height: 88px;
+  margin: 0 auto;
+  padding: 0 24px;
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+  position: relative;
+}
 
+
+/* =========================================================
+   HEADER TITEL
+   ========================================================= */
+
+.header-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   text-align: center;
 }
 
-.header h1 {
-  margin: 0 0 6px 0;
-
-  font-size: 30px;
+.header-title h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
   font-weight: 700;
-
+  letter-spacing: -0.5px;
   color: #ffffff;
 }
 
-.header p {
+.header-title p {
   margin: 0;
-
-  color: #8996a3;
-  font-size: 14px;
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  color: #8fa4b5;
 }
 
 
-/* =========================
+/* =========================================================
+   SYSTEEMSTATUS
+   ========================================================= */
+
+.header-status {
+  position: absolute;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.header-status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #42c77a;
+  box-shadow:
+    0 0 0 4px rgba(66, 199, 122, 0.10),
+    0 0 12px rgba(66, 199, 122, 0.35);
+}
+
+.header-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.header-status-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+  color: #708494;
+}
+
+.header-status-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: #dce7ed;
+}
+
+
+/* =========================================================
+   GROENE ACCENTLIJN
+   ========================================================= */
+
+.header-accent {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: #42c77a;
+}
+
+
+/* =========================================================
    ZOEKPANEEL
-   ========================= */
+   ========================================================= */
 
 .search-panel {
-  width: min(900px, calc(100% - 40px));
-
-  margin: 28px auto 24px auto;
-
-  padding: 24px;
-
+  width: min(780px, calc(100% - 40px));
+  margin: 24px auto 20px auto;
+  padding: 20px;
   background: #101820;
-
   border: 1px solid #202b36;
-
-  border-radius: 10px;
-
+  border-radius: 9px;
   box-shadow:
     0 8px 30px rgba(0, 0, 0, 0.25);
 }
 
 .search-panel h2 {
-  margin: 0 0 16px 0;
-
+  margin: 0 0 14px 0;
   text-align: center;
-
-  font-size: 18px;
-
+  font-size: 17px;
   color: #ffffff;
 }
 
 
-/* =========================
+/* =========================================================
    DASHBOARD
-   ========================= */
+   ========================================================= */
 
 .dashboard {
-  width: min(1400px, calc(100% - 40px));
-
-  margin: 0 auto 40px auto;
-
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto 32px auto;
   display: grid;
-
   grid-template-columns:
     minmax(0, 1fr)
     minmax(0, 1fr);
-
-  gap: 20px;
+  gap: 16px;
 }
 
 
-/* =========================
+/* =========================================================
    PANELEN
-   ========================= */
+   ========================================================= */
 
 .panel {
   background: #101820;
-
   border: 1px solid #202b36;
-
-  border-radius: 10px;
-
+  border-radius: 9px;
   overflow: hidden;
-
   box-shadow:
     0 8px 30px rgba(0, 0, 0, 0.25);
 }
 
 .panel h2 {
   margin: 0;
-
-  padding: 18px 20px;
-
-  font-size: 17px;
-
+  padding: 15px 17px;
+  font-size: 16px;
   font-weight: 600;
-
   color: #ffffff;
-
   background: #121c25;
-
   border-bottom: 1px solid #202b36;
 }
 
 
-/* =========================
+/* =========================================================
    METEO
-   ========================= */
+   ========================================================= */
 
 .weather-panel {
-  min-height: 220px;
+  min-height: 190px;
 }
 
 
-/* =========================
+/* =========================================================
    KWETSBARE OBJECTEN
-   ========================= */
+   ========================================================= */
 
 .objects-panel {
-  min-height: 220px;
+  min-height: 190px;
 }
 
 
-/* Titel + aantal */
+/* =========================================================
+   TITEL + AANTAL
+   ========================================================= */
 
 .panel-title-row {
   display: flex;
-
   align-items: center;
-
   justify-content: space-between;
-
   background: #121c25;
-
   border-bottom: 1px solid #202b36;
 }
 
 .panel-title-row h2 {
   flex: 1;
-
   border-bottom: none;
 }
 
 
-/* Aantal objecten */
+/* =========================================================
+   TOTAAL OBJECTEN
+   ========================================================= */
 
 .object-total {
-  margin-right: 20px;
-
-  min-width: 30px;
-
-  height: 30px;
-
+  margin-right: 17px;
+  min-width: 28px;
+  height: 28px;
   display: flex;
-
   align-items: center;
-
   justify-content: center;
-
-  padding: 0 9px;
-
+  padding: 0 8px;
   background: #22c55e;
-
   color: #061009;
-
   border-radius: 15px;
-
-  font-size: 13px;
-
+  font-size: 12px;
   font-weight: 700;
 }
 
 
-/* Objectenlijst */
+/* =========================================================
+   OBJECTENLIJST
+   ========================================================= */
 
 .objects-list {
-  max-height: 280px;
-
+  max-height: 250px;
   overflow-y: auto;
 }
 
 
-/* Scrollbar */
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
 
 .objects-list::-webkit-scrollbar {
-  width: 7px;
+  width: 6px;
 }
 
 .objects-list::-webkit-scrollbar-track {
@@ -217,7 +275,6 @@
 
 .objects-list::-webkit-scrollbar-thumb {
   background: #2b3946;
-
   border-radius: 10px;
 }
 
@@ -226,19 +283,145 @@
 }
 
 
-/* Objectregel */
+/* =========================================================
+   CATEGORIE
+   ========================================================= */
+
+.object-category {
+  margin-bottom: 5px;
+}
+
+.object-category:last-child {
+  margin-bottom: 0;
+}
+
+
+/* =========================================================
+   CATEGORIEBALK
+   ========================================================= */
+
+.object-category-title {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  margin: 0;
+  border: none;
+  border-bottom: 1px solid #202b36;
+  background: #101820;
+  color: #ffffff;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.object-category-title:hover {
+  background: #151e27;
+}
+
+.object-category-open .object-category-title {
+  border-bottom-color: #26333f;
+}
+
+
+/* =========================================================
+   CATEGORIE ICOON
+   ========================================================= */
+
+.object-category-icon {
+  width: 22px;
+  min-width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.object-category-name {
+  flex: 1;
+}
+
+
+/* =========================================================
+   GROENE AANTAL-BOL
+   ========================================================= */
+
+.object-category-count {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #061009;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow:
+    0 0 0 2px rgba(34, 197, 94, 0.10);
+}
+
+
+/* =========================================================
+   PIJLTJE
+   ========================================================= */
+
+.category-chevron {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7f909e;
+  font-size: 21px;
+  font-weight: 400;
+  line-height: 1;
+  transition:
+    transform 0.18s ease,
+    color 0.15s ease;
+}
+
+.object-category-title:hover .category-chevron {
+  color: #ffffff;
+}
+
+.category-chevron.collapsed {
+  transform: rotate(0deg);
+}
+
+.category-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+
+/* =========================================================
+   OBJECTEN BINNEN CATEGORIE
+   ========================================================= */
+
+.object-category-list {
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* =========================================================
+   OBJECTREGEL
+   ========================================================= */
 
 .object-row {
   display: flex;
-
   align-items: center;
-
-  gap: 12px;
-
-  padding: 12px 16px;
-
+  gap: 9px;
+  padding: 8px 9px;
   border-bottom: 1px solid #202b36;
-
   transition:
     background 0.15s ease;
 }
@@ -248,144 +431,114 @@
 }
 
 .object-row:hover {
-  background: #151e27;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 
-/* Objecticoon */
+/* =========================================================
+   OBJECTICOON
+   ========================================================= */
 
 .object-icon {
-  width: 38px;
-
-  min-width: 38px;
-
-  height: 38px;
-
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
   display: flex;
-
   align-items: center;
-
   justify-content: center;
-
-  background: #0b1117;
-
-  border: 1px solid #27333e;
-
-  border-radius: 7px;
-
-  font-size: 20px;
 }
 
 
-/* Objectinformatie */
+/* =========================================================
+   OBJECTINFORMATIE
+   ========================================================= */
 
 .object-details {
   flex: 1;
-
   min-width: 0;
 }
 
 .object-name {
   color: #ffffff;
-
-  font-size: 14px;
-
+  font-size: 13px;
   font-weight: 600;
-
   white-space: nowrap;
-
   overflow: hidden;
-
   text-overflow: ellipsis;
 }
 
 .object-type {
   margin-top: 2px;
-
   color: #8996a3;
-
-  font-size: 12px;
-
-  text-transform: capitalize;
+  font-size: 11px;
 }
 
 
-/* Afstand */
+/* =========================================================
+   AFSTAND
+   ========================================================= */
 
 .object-distance {
+  flex-shrink: 0;
   color: #4ade80;
-
-  font-size: 13px;
-
+  font-size: 12px;
   font-weight: 600;
-
   white-space: nowrap;
 }
 
 
-/* Laden */
+/* =========================================================
+   LADEN
+   ========================================================= */
 
 .objects-loading {
-  padding: 35px 20px;
-
+  padding: 30px 18px;
   text-align: center;
-
   color: #8996a3;
+  font-size: 12px;
+}
 
-  font-size: 13px;
+.loading-icon {
+  margin-bottom: 7px;
+  font-size: 23px;
+  color: #4ade80;
 }
 
 
-/* Geen objecten */
+/* =========================================================
+   GEEN OBJECTEN
+   ========================================================= */
 
 .objects-empty {
-  min-height: 170px;
-
+  min-height: 150px;
   display: flex;
-
   flex-direction: column;
-
   align-items: center;
-
   justify-content: center;
-
-  gap: 10px;
-
-  padding: 30px 20px;
-
+  gap: 9px;
+  padding: 25px 18px;
   text-align: center;
-
   color: #8996a3;
-
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .empty-icon {
-  width: 42px;
-
-  height: 42px;
-
+  width: 38px;
+  height: 38px;
   display: flex;
-
   align-items: center;
-
   justify-content: center;
-
   border-radius: 50%;
-
   background: rgba(34, 197, 94, 0.12);
-
   color: #4ade80;
-
-  font-size: 20px;
-
+  font-size: 18px;
   font-weight: 700;
 }
 
 
-/* =========================
+/* =========================================================
    KAART
-   ========================= */
+   ========================================================= */
 
 .map-panel {
   grid-column: 1 / -1;
@@ -393,42 +546,30 @@
 
 .map-panel h2 {
   display: flex;
-
   align-items: center;
 }
 
 
-/* =========================
+/* =========================================================
    ZOEKVELD
-   ========================= */
+   ========================================================= */
 
 .search-container {
   position: relative;
-
   display: flex;
-
-  gap: 10px;
-
+  gap: 9px;
   width: 100%;
 }
 
 .search-container input {
   flex: 1;
-
   min-width: 0;
-
-  padding: 13px 15px;
-
+  padding: 11px 13px;
   background: #0a1016;
-
   color: #ffffff;
-
   border: 1px solid #2b3946;
-
   border-radius: 7px;
-
-  font-size: 14px;
-
+  font-size: 13px;
   outline: none;
 }
 
@@ -438,28 +579,19 @@
 
 .search-container input:focus {
   border-color: #4ade80;
-
   box-shadow:
     0 0 0 2px rgba(74, 222, 128, 0.12);
 }
 
 .search-container button {
-  padding: 0 24px;
-
+  padding: 0 21px;
   background: #22c55e;
-
   color: #061009;
-
   border: none;
-
   border-radius: 7px;
-
   font-weight: 700;
-
-  font-size: 14px;
-
+  font-size: 13px;
   cursor: pointer;
-
   transition:
     background 0.15s ease,
     transform 0.15s ease;
@@ -475,22 +607,17 @@
 
 .search-container p {
   position: absolute;
-
   left: 0;
-
   top: 100%;
-
-  margin: 6px 0 0 0;
-
+  margin: 5px 0 0 0;
   color: #f87171;
-
-  font-size: 13px;
+  font-size: 12px;
 }
 
 
-/* =========================
+/* =========================================================
    LEAFLET
-   ========================= */
+   ========================================================= */
 
 .leaflet-container {
   background: #111820;
@@ -506,34 +633,45 @@
 }
 
 
-/* =========================
+/* =========================================================
    MOBIEL
-   ========================= */
+   ========================================================= */
 
 @media (max-width: 800px) {
 
-  .header {
-    padding: 20px;
+  .header-inner {
+    min-height: 78px;
+    padding: 0 16px;
   }
 
-  .header h1 {
-    font-size: 24px;
+  .header-title h1 {
+    font-size: 23px;
   }
 
-  .header p {
-    font-size: 13px;
+  .header-title p {
+    font-size: 9px;
+    letter-spacing: 0.7px;
+  }
+
+  .header-status {
+    right: 16px;
+    padding: 6px 8px;
+  }
+
+  .header-status-text {
+    display: none;
   }
 
   .search-panel {
     width: calc(100% - 24px);
-
-    margin-top: 16px;
+    margin-top: 15px;
+    padding: 18px;
   }
 
   .dashboard {
     width: calc(100% - 24px);
-
     grid-template-columns: 1fr;
+    gap: 14px;
   }
 
   .map-panel {
@@ -545,91 +683,23 @@
   }
 
   .search-container button {
-    height: 45px;
+    height: 42px;
   }
 
   .object-row {
-    padding: 11px 12px;
+    padding: 8px 9px;
   }
 
   .object-name {
-    font-size: 13px;
+    font-size: 12px;
   }
 
-}
-.object-category {
-  margin-bottom: 18px;
-}
+  .object-category-title {
+    padding: 9px 9px;
+  }
 
-.object-category-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  margin-bottom: 4px;
-  font-weight: 700;
-  font-size: 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.object-category-icon {
-  font-size: 18px;
-}
-
-.object-category-name {
-  flex: 1;
-}
-
-.object-category-count {
-  min-width: 24px;
-  text-align: center;
-  font-size: 12px;
-  padding: 3px 7px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.object-category-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.object-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-}
-
-.object-row:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.object-icon {
-  width: 30px;
-  flex-shrink: 0;
-  text-align: center;
-  font-size: 20px;
-}
-
-.object-details {
-  flex: 1;
-  min-width: 0;
-}
-
-.object-name {
-  font-weight: 600;
-}
-
-.object-type {
-  margin-top: 2px;
-  font-size: 12px;
-  opacity: 0.65;
-}
-
-.object-distance {
-  flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
+  .object-category-count {
+    min-width: 23px;
+    height: 23px;
+  }
 }

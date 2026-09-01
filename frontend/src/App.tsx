@@ -292,7 +292,8 @@ function objectTypeName(
 
 
 /* =========================================================
-   TYPE → ICOON
+   SVG ICOON VOOR OBJECT
+   Zelfde stijl als op de kaart
    ========================================================= */
 
 function iconForType(
@@ -301,101 +302,384 @@ function iconForType(
 
   switch (type) {
 
+    /* =====================================================
+       ZIEKENHUIS / KLINIEK
+       ===================================================== */
+
     case "hospital":
-      return "🏥";
+    case "clinic":
+
+      return `
+        <svg
+          viewBox="0 0 32 32"
+          width="28"
+          height="28"
+        >
+          <rect
+            x="5"
+            y="4"
+            width="22"
+            height="24"
+            rx="2"
+            fill="#d32f2f"
+          />
+
+          <rect
+            x="13"
+            y="8"
+            width="6"
+            height="16"
+            fill="white"
+          />
+
+          <rect
+            x="8"
+            y="13"
+            width="16"
+            height="6"
+            fill="white"
+          />
+        </svg>
+      `;
+
+
+    /* =====================================================
+       ZORG
+       ===================================================== */
 
     case "healthcare":
-      return "⚕️";
-
-    case "nursing_home":
-      return "👵";
-
-    case "care_home":
-      return "🏠";
-
-    case "residential_care":
-      return "🏠";
-
     case "care":
-      return "♿";
+    case "nursing_home":
+    case "care_home":
+    case "residential_care":
 
-    case "clinic":
-      return "🏥";
+      return `
+        <svg
+          viewBox="0 0 32 32"
+          width="28"
+          height="28"
+        >
+          <circle
+            cx="16"
+            cy="16"
+            r="13"
+            fill="#1976d2"
+          />
+
+          <path
+            d="M16 8V24"
+            stroke="white"
+            stroke-width="3"
+            stroke-linecap="round"
+          />
+
+          <path
+            d="M8 16H24"
+            stroke="white"
+            stroke-width="3"
+            stroke-linecap="round"
+          />
+        </svg>
+      `;
+
+
+    /* =====================================================
+       HUISARTS / TANDARTS / APOTHEEK
+       ===================================================== */
 
     case "doctors":
-      return "🩺";
+
+      return `
+        <svg
+          viewBox="0 0 32 32"
+          width="28"
+          height="28"
+        >
+          <circle
+            cx="16"
+            cy="16"
+            r="13"
+            fill="#1976d2"
+          />
+
+          <path
+            d="M11 10V17C11 20 13 22 16 22C19 22 21 20 21 17V10"
+            fill="none"
+            stroke="white"
+            stroke-width="2.5"
+            stroke-linecap="round"
+          />
+
+          <path
+            d="M11 10H15"
+            stroke="white"
+            stroke-width="2.5"
+            stroke-linecap="round"
+          />
+
+          <path
+            d="M17 10H21"
+            stroke="white"
+            stroke-width="2.5"
+            stroke-linecap="round"
+          />
+        </svg>
+      `;
+
 
     case "dentist":
-      return "🦷";
+
+      return `
+        <svg
+          viewBox="0 0 32 32"
+          width="28"
+          height="28"
+        >
+          <circle
+            cx="16"
+            cy="16"
+            r="13"
+            fill="#1976d2"
+          />
+
+          <path
+            d="M10 10C12 8 14 10 16 10C18 10 20 8 22 10C23 12 21 15 21 18C21 21 19 24 18 24C17 24 17 20 16 20C15 20 15 24 14 24C13 24 11 21 11 18C11 15 9 12 10 10Z"
+            fill="white"
+          />
+        </svg>
+      `;
+
 
     case "pharmacy":
-      return "💊";
 
-    case "physiotherapist":
-      return "🦵";
+      return `
+        <svg
+          viewBox="0 0 32 32"
+          width="28"
+          height="28"
+        >
+          <circle
+            cx="16"
+            cy="16"
+            r="13"
+            fill="#1976d2"
+          />
 
-    case "psychologist":
-      return "🧠";
+          <rect
+            x="10"
+            y="13"
+            width="12"
+            height="6"
+            rx="2"
+            fill="white"
+          />
+
+          <rect
+            x="13"
+            y="10"
+            width="6"
+            height="12"
+            rx="2"
+            fill="white"
+          />
+        </svg>
+      `;
+
+
+    /* =====================================================
+       ONDERWIJS
+       ===================================================== */
 
     case "school":
-      return "🏫";
-
     case "kindergarten":
-      return "👶";
-
     case "childcare":
-      return "👶";
-
     case "college":
-      return "🎓";
-
     case "university":
-      return "🎓";
+
+      return `
+        <svg
+          viewBox="0 0 32 32"
+          width="28"
+          height="28"
+        >
+          <path
+            d="M3 13L16 4L29 13L16 22L3 13Z"
+            fill="#f9a825"
+          />
+
+          <path
+            d="M8 16V27H24V16"
+            fill="#f9a825"
+          />
+
+          <rect
+            x="13"
+            y="20"
+            width="6"
+            height="7"
+            fill="white"
+          />
+        </svg>
+      `;
+
+
+    /* =====================================================
+       RELIGIE
+       ===================================================== */
 
     case "church":
-      return "⛪";
-
     case "place_of_worship":
-      return "🛐";
-
     case "mosque":
-      return "🕌";
-
     case "synagogue":
-      return "✡️";
 
-    case "supermarket":
-      return "🛒";
+      return `
+        <svg
+          viewBox="0 0 32 32"
+          width="28"
+          height="28"
+        >
+          <path
+            d="M6 27H26"
+            stroke="#7b1fa2"
+            stroke-width="2"
+          />
 
-    case "department_store":
-      return "🏬";
+          <path
+            d="M9 27V15H23V27"
+            fill="#7b1fa2"
+          />
 
-    case "shopping_centre":
-      return "🏬";
+          <path
+            d="M7 15H25L16 7L7 15Z"
+            fill="#7b1fa2"
+          />
 
-    case "mall":
-      return "🏬";
+          <path
+            d="M16 3V10"
+            stroke="#7b1fa2"
+            stroke-width="2"
+          />
 
-    case "hardware_store":
-      return "🔨";
+          <path
+            d="M13 6H19"
+            stroke="#7b1fa2"
+            stroke-width="2"
+          />
+        </svg>
+      `;
+
+
+    /* =====================================================
+       WINKEL
+       ===================================================== */
 
     case "shop":
-      return "🏪";
+    case "supermarket":
+    case "department_store":
+    case "shopping_centre":
+    case "mall":
+    case "hardware_store":
+
+      return `
+        <svg
+          viewBox="0 0 32 32"
+          width="28"
+          height="28"
+        >
+          <path
+            d="M5 12L7 5H25L27 12Z"
+            fill="#ef6c00"
+          />
+
+          <rect
+            x="6"
+            y="12"
+            width="20"
+            height="15"
+            fill="#fb8c00"
+          />
+
+          <rect
+            x="11"
+            y="18"
+            width="10"
+            height="9"
+            fill="white"
+          />
+        </svg>
+      `;
+
+
+    /* =====================================================
+       MAATSCHAPPELIJK
+       ===================================================== */
 
     case "community":
-      return "🏢";
-
     case "community_centre":
-      return "🏢";
+
+      return `
+        <svg
+          viewBox="0 0 32 32"
+          width="28"
+          height="28"
+        >
+          <path
+            d="M4 14L16 5L28 14V27H4V14Z"
+            fill="#388e3c"
+          />
+
+          <rect
+            x="9"
+            y="17"
+            width="5"
+            height="6"
+            fill="white"
+          />
+
+          <rect
+            x="18"
+            y="17"
+            width="5"
+            height="6"
+            fill="white"
+          />
+        </svg>
+      `;
+
+
+    /* =====================================================
+       OVERIG
+       ===================================================== */
 
     default:
-      return "📍";
+
+      return `
+        <svg
+          viewBox="0 0 32 32"
+          width="28"
+          height="28"
+        >
+          <circle
+            cx="16"
+            cy="16"
+            r="11"
+            fill="#607d8b"
+          />
+
+          <circle
+            cx="16"
+            cy="16"
+            r="4"
+            fill="white"
+          />
+        </svg>
+      `;
   }
 }
 
 
 /* =========================================================
-   CATEGORIE → ICOON
+   CATEGORIE ICOON
    ========================================================= */
 
 function categoryIcon(
@@ -478,6 +762,7 @@ function App() {
     setObjects
   ] = useState<VulnerableObject[]>([]);
 
+
   const [
     objectsLoading,
     setObjectsLoading
@@ -495,16 +780,123 @@ function App() {
 
 
   /* =======================================================
+     INGEKLAPTE CATEGORIEËN
+     
+     true = ingeklapt
+     false = open
+     
+     Standaard staan alle categorieën ingeklapt.
+     ======================================================= */
+
+  const [
+    collapsedCategories,
+    setCollapsedCategories
+  ] = useState<Record<Category, boolean>>({
+    Zorg: true,
+    Onderwijs: true,
+    Religie: true,
+    Winkels: true,
+    Maatschappelijk: true,
+    Overig: true,
+  });
+
+
+  /* =======================================================
+     CATEGORIE OPEN / DICHT
+     ======================================================= */
+
+  function toggleCategory(
+    category: Category
+  ) {
+
+    setCollapsedCategories(
+      (previous) => ({
+        ...previous,
+        [category]: !previous[category],
+      })
+    );
+  }
+
+
+  /* =======================================================
      AANVRAAG-ID
-     
-     Iedere nieuwe zoekopdracht krijgt een eigen nummer.
-     
-     Hierdoor kunnen resultaten van een oude zoekopdracht
-     niet meer de nieuwe locatie overschrijven.
      ======================================================= */
 
   const requestIdRef =
     useRef(0);
+
+
+  /* =======================================================
+     OBJECTEN OPHALEN
+     ======================================================= */
+
+  async function loadObjects(
+    latitude: number,
+    longitude: number,
+    requestId: number
+  ) {
+
+    console.log(
+      "🔎 Objecten ophalen binnen:",
+      OBJECT_SEARCH_RADIUS,
+      "meter"
+    );
+
+    try {
+
+      const result =
+        await getVulnerableObjects(
+          latitude,
+          longitude,
+          OBJECT_SEARCH_RADIUS
+        );
+
+
+      if (
+        requestId !== requestIdRef.current
+      ) {
+
+        console.log(
+          "⚠️ Oude objectaanvraag genegeerd."
+        );
+
+        return;
+      }
+
+
+      console.log(
+        "✅ Objecten ontvangen:",
+        result.length
+      );
+
+      setObjects(result);
+
+    } catch (error) {
+
+      if (
+        requestId !== requestIdRef.current
+      ) {
+        return;
+      }
+
+      console.error(
+        "❌ Fout bij objecten:",
+        error
+      );
+
+      setObjects([]);
+
+    } finally {
+
+      if (
+        requestId === requestIdRef.current
+      ) {
+
+        setObjectsLoading(false);
+
+      }
+    }
+  }
 
 
   /* =======================================================
@@ -519,10 +911,6 @@ function App() {
     }
   ) {
 
-    /* -----------------------------------------------------
-       NIEUWE AANVRAAG
-       ----------------------------------------------------- */
-
     requestIdRef.current += 1;
 
     const requestId =
@@ -531,18 +919,11 @@ function App() {
 
     console.log(
       "📍 Nieuwe locatie:",
-      locationData
-    );
-
-    console.log(
-      "🔄 Zoekopdracht:",
+      locationData,
+      "request:",
       requestId
     );
 
-
-    /* -----------------------------------------------------
-       LOCATIE DIRECT INSTELLEN
-       ----------------------------------------------------- */
 
     setLocation(locationData);
 
@@ -560,141 +941,61 @@ function App() {
     setObjectsLoading(true);
 
 
-    /* =====================================================
-       WEER EN OBJECTEN TEGELIJK OPHALEN
-       ===================================================== */
-
-    const weatherPromise =
-      getWeather(
-        locationData.latitude,
-        locationData.longitude
-      );
-
-    const objectsPromise =
-      getVulnerableObjects(
-        locationData.latitude,
-        locationData.longitude,
-        OBJECT_SEARCH_RADIUS
-      );
-
-
-    /* =====================================================
+    /* -----------------------------------------------------
        WEER
-       ===================================================== */
+       ----------------------------------------------------- */
 
     try {
 
       const weatherData =
-        await weatherPromise;
+        await getWeather(
+          locationData.latitude,
+          locationData.longitude
+        );
 
 
       if (
         requestId !== requestIdRef.current
       ) {
 
-        console.log(
-          "⚠️ Oude weer-aanvraag genegeerd."
-        );
-
-      } else {
-
-        console.log(
-          "🌤️ Nieuwe weersgegevens ontvangen."
-        );
-
-        setWeather(weatherData);
-
+        return;
       }
+
+
+      setWeather(weatherData);
 
     } catch (error) {
 
       if (
-        requestId === requestIdRef.current
+        requestId !== requestIdRef.current
       ) {
 
-        console.error(
-          "❌ Fout bij ophalen weer:",
-          error
-        );
-
-        setWeather(null);
-
+        return;
       }
+
+      console.error(
+        "❌ Fout bij weer:",
+        error
+      );
+
+      setWeather(null);
     }
 
 
-    /* =====================================================
+    /* -----------------------------------------------------
        OBJECTEN
-       ===================================================== */
+       ----------------------------------------------------- */
 
-    try {
-
-      const objectData =
-        await objectsPromise;
-
-
-      if (
-        requestId !== requestIdRef.current
-      ) {
-
-        console.log(
-          "⚠️ Oude object-aanvraag genegeerd."
-        );
-
-      } else {
-
-        console.log(
-          "🏢 Nieuwe objecten ontvangen:",
-          objectData.length
-        );
-
-        setObjects(objectData);
-
-      }
-
-    } catch (error) {
-
-      if (
-        requestId === requestIdRef.current
-      ) {
-
-        console.error(
-          "❌ Fout bij ophalen objecten:",
-          error
-        );
-
-        setObjects([]);
-
-      }
-
-    } finally {
-
-      if (
-        requestId === requestIdRef.current
-      ) {
-
-        setObjectsLoading(false);
-
-      }
-    }
+    await loadObjects(
+      locationData.latitude,
+      locationData.longitude,
+      requestId
+    );
   }
 
 
   /* =========================================================
      OBJECTEN FILTEREN
-     
-     Een object wordt zichtbaar wanneer het:
-     
-     1. binnen 500 meter van het incident ligt
-     
-     OF
-     
-     2. binnen de actuele gasmal ligt.
-     
-     De backend zoekt 3000 meter.
-     
-     Hierdoor kunnen ook objecten die bijvoorbeeld 1,5 of
-     2 kilometer benedenwinds liggen in de gasmal verschijnen.
      ========================================================= */
 
   const visibleObjects =
@@ -708,7 +1009,7 @@ function App() {
 
 
         /* ---------------------------------------------------
-           NAAMLOZE WINKELCENTRA NIET TONEN
+           NAAMLOZE WINKELCENTRA UITSLUITEN
            --------------------------------------------------- */
 
         if (
@@ -741,7 +1042,7 @@ function App() {
 
 
         /* ---------------------------------------------------
-           BINNEN 500 METER
+           500 METER
            --------------------------------------------------- */
 
         if (
@@ -765,7 +1066,7 @@ function App() {
 
 
         /* ---------------------------------------------------
-           BINNEN GASZONE
+           GASZONE
            --------------------------------------------------- */
 
         return pointInPolygon(
@@ -830,17 +1131,43 @@ function App() {
 
       <header className="header">
 
-        <div>
+        <div className="header-inner">
 
-          <h1>
-            Omgevingsscan
-          </h1>
+          <div className="header-title">
 
-          <p>
-            Incidentondersteuning • Omgevingsanalyse • Veiligheidsbeeld
-          </p>
+            <h1>
+              Omgevingsscan
+            </h1>
+
+            <p>
+              Incidentondersteuning • Omgevingsanalyse • Veiligheidsbeeld
+            </p>
+
+          </div>
+
+
+          <div className="header-status">
+
+            <span className="header-status-indicator" />
+
+            <div className="header-status-text">
+
+              <span className="header-status-label">
+                SYSTEEMSTATUS
+              </span>
+
+              <span className="header-status-value">
+                Operationeel
+              </span>
+
+            </div>
+
+          </div>
 
         </div>
+
+
+        <div className="header-accent" />
 
       </header>
 
@@ -911,10 +1238,6 @@ function App() {
 
           </div>
 
-
-          {/* ------------------------------------------------
-              LADEN
-              ------------------------------------------------ */}
 
           {objectsLoading ? (
 
@@ -992,23 +1315,33 @@ function App() {
                     );
 
 
+                  const isCollapsed =
+                    collapsedCategories[category];
+
+
                   return (
 
                     <div
-                      className={`object-category category-${category
-                        .toLowerCase()
-                        .replace(
-                          /[^a-z0-9]+/g,
-                          "-"
-                        )}`}
+                      className={`object-category ${
+                        isCollapsed
+                          ? "object-category-collapsed"
+                          : "object-category-open"
+                      }`}
                       key={category}
                     >
 
-                      {/* -----------------------------------
-                          CATEGORIE HEADER
-                          ----------------------------------- */}
+                      {/* =================================
+                          CATEGORIEBALK
+                          ================================= */}
 
-                      <div className="object-category-title">
+                      <button
+                        type="button"
+                        className="object-category-title"
+                        onClick={() =>
+                          toggleCategory(category)
+                        }
+                        aria-expanded={!isCollapsed}
+                      >
 
                         <span className="object-category-icon">
                           {categoryIcon(category)}
@@ -1022,69 +1355,92 @@ function App() {
                           {sortedObjects.length}
                         </span>
 
-                      </div>
+                        <span
+                          className={`category-chevron ${
+                            isCollapsed
+                              ? "collapsed"
+                              : "expanded"
+                          }`}
+                        >
+                          ›
+                        </span>
+
+                      </button>
 
 
-                      {/* -----------------------------------
+                      {/* =================================
                           OBJECTEN
-                          ----------------------------------- */}
+                          ================================= */}
 
-                      <div className="object-category-list">
+                      {!isCollapsed && (
 
-                        {sortedObjects.map(
-                          (object) => {
+                        <div className="object-category-list">
 
-                            const distance =
-                              distanceInMeters(
-                                location.latitude,
-                                location.longitude,
-                                object.latitude,
-                                object.longitude
+                          {sortedObjects.map(
+                            (object) => {
+
+                              const distance =
+                                distanceInMeters(
+                                  location.latitude,
+                                  location.longitude,
+                                  object.latitude,
+                                  object.longitude
+                                );
+
+
+                              return (
+
+                                <div
+                                  className="object-row"
+                                  key={object.id}
+                                >
+
+                                  <div
+                                    className="object-icon"
+                                    dangerouslySetInnerHTML={{
+                                      __html:
+                                        iconForType(
+                                          object.type
+                                        )
+                                    }}
+                                  />
+
+
+                                  <div className="object-details">
+
+                                    <div className="object-name">
+                                      {object.name}
+                                    </div>
+
+                                    <div className="object-type">
+                                      {objectTypeName(
+                                        object.type
+                                      )}
+                                    </div>
+
+                                  </div>
+
+
+                                  <div className="object-distance">
+
+                                    {distance < 1000
+                                      ? `${Math.round(distance)} m`
+                                      : `${(
+                                          distance / 1000
+                                        ).toFixed(1)} km`
+                                    }
+
+                                  </div>
+
+                                </div>
+
                               );
+                            }
+                          )}
 
-                            return (
+                        </div>
 
-                              <div
-                                className="object-row"
-                                key={object.id}
-                              >
-
-                                <div className="object-icon">
-                                  {iconForType(object.type)}
-                                </div>
-
-
-                                <div className="object-details">
-
-                                  <div className="object-name">
-                                    {object.name}
-                                  </div>
-
-                                  <div className="object-type">
-                                    {objectTypeName(object.type)}
-                                  </div>
-
-                                </div>
-
-
-                                <div className="object-distance">
-
-                                  {distance < 1000
-                                    ? `${Math.round(distance)} m`
-                                    : `${(
-                                        distance / 1000
-                                      ).toFixed(1)} km`
-                                  }
-
-                                </div>
-
-                              </div>
-
-                            );
-                          }
-                        )}
-
-                      </div>
+                      )}
 
                     </div>
 
@@ -1112,11 +1468,19 @@ function App() {
           <MapView
             latitude={location.latitude}
             longitude={location.longitude}
-            windDirection={weather?.windDirection ?? 0}
-            windSpeed={weather?.windSpeed ?? 0}
-            weatherLoaded={weather !== null}
-            objects={objects}
-            onGasZoneCreated={setGasZone}
+            windDirection={
+              weather?.windDirection ?? 0
+            }
+            windSpeed={
+              weather?.windSpeed ?? 0
+            }
+            weatherLoaded={
+              weather !== null
+            }
+            objects={visibleObjects}
+            onGasZoneCreated={
+              setGasZone
+            }
           />
 
         </section>
