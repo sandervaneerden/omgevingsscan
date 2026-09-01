@@ -330,11 +330,27 @@ out center tags;
       // ==================================================
       // NAAM
       // ==================================================
+      //
+      // Een aantal BAG-schoolgebouwen heeft geen
+      // naam in OpenStreetMap.
+      //
+      // Deze worden herkenbaar weergegeven als:
+      //
+      // Schoolgebouw (BAG)
+      //
+      // in plaats van:
+      //
+      // Onbekend object
+      // ==================================================
 
       const name =
         tags.name ||
         tags["name:nl"] ||
-        "Onbekend object";
+        (
+          tags.building === "school"
+            ? "Schoolgebouw (BAG)"
+            : "Onbekend object"
+        );
 
 
       // ==================================================
