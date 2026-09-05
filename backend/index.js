@@ -1,391 +1,897 @@
 const express = require("express");
 const cors = require("cors");
+const dns = require("dns");
+
+// Geef IPv4 voorrang.
+// Dit voorkomt dat Node fetch blijft hangen op een IPv6-route
+// die in Codespaces mogelijk niet goed werkt.
+dns.setDefaultResultOrder("ipv4first");
 
 const app = express();
-const PORT = 3001;
 
 app.use(cors());
 app.use(express.json());
 
-const OVERPASS_URLS = [
-  "https://overpass-api.de/api/interpreter",
+const PORT = process.env.PORT || 3001;
+
+/*
+ * =========================
+ * OVERPASS SERVERS
+ * =========================
+ */
+
+const OVERPASS_SERVERS = [
+  "https://overpass.kumi.systems/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
+  "https://overpass-api.de/api/interpreter",
 ];
 
-// ---------------------------------------------------------
-// Afstand tussen twee coordinaten in meters
-// ---------------------------------------------------------
+/*
+ * =========================
+ * AFSTAND BEREKENEN
+ * =========================
+ */
+
 function distanceMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
 
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const toRad = (value) =>
+    (value * Math.PI) / 180;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
 
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
       Math.sin(dLon / 2) ** 2;
 
-  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const c =
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    );
+
+  return R * c;
 }
 
-// ---------------------------------------------------------
-// Type bepalen
-// ---------------------------------------------------------
-function getObjectType(tags = {}) {
-  // Zorginstellingen / maatschappelijke voorzieningen
-  if (tags.social_facility) {
-    return tags.social_facility;
-  }
+/*
+ * =========================
+ * NAAM OBJECT
+ * =========================
+ */
 
-  // Zorg via amenity=clinic/hospital/etc.
-  if (tags.amenity === "hospital") {
-    return "hospital";
-  }
-
-  if (tags.amenity === "clinic") {
-    return "clinic";
-  }
-
-  if (tags.amenity === "doctors") {
-    return "doctor";
-  }
-
-  if (tags.amenity === "pharmacy") {
-    return "pharmacy";
-  }
-
-  if (tags.amenity === "school") {
-    return "school";
-  }
-
-  if (tags.amenity === "kindergarten") {
-    return "kindergarten";
-  }
-
-  if (tags.amenity === "place_of_worship") {
-    return "church";
-  }
-
-  if (tags.amenity === "community_centre") {
-    return "community";
-  }
-
-  if (tags.tourism === "hotel") {
-    return "hotel";
-  }
-
-  if (tags.shop === "supermarket") {
-    return "supermarket";
-  }
-
-  if (tags.amenity === "social_facility") {
-    return "care_facility";
-  }
-
-  if (tags.shop) {
-    return "shop";
-  }
-
-  return null;
-}
-
-// ---------------------------------------------------------
-// Naam bepalen
-// ---------------------------------------------------------
 function getObjectName(tags = {}) {
   return (
     tags.name ||
-    tags["official_name"] ||
-    tags["alt_name"] ||
-    tags["short_name"] ||
+    tags["name:nl"] ||
+    tags.operator ||
+    tags.brand ||
     "Onbekende locatie"
   );
 }
 
-// ---------------------------------------------------------
-// Overpass query
-// ---------------------------------------------------------
-function buildOverpassQuery(latitude, longitude, radius) {
-  return `
-[out:json][timeout:50];
+/*
+ * =========================
+ * OBJECT TYPE
+ * =========================
+ */
 
-(
-  // -------------------------------------------------------
-  // Alle social facilities
-  // Hiermee pakken we o.a.:
-  // group_home
-  // assisted_living
-  // nursing_home
-  // outreach
-  // workshop
-  // shelter
-  // etc.
-  // -------------------------------------------------------
-  nwr["amenity"="social_facility"](around:${radius},${latitude},${longitude});
+function getObjectType(tags = {}) {
+  const amenity = String(
+    tags.amenity || ""
+  ).toLowerCase();
 
-  // -------------------------------------------------------
-  // Ziekenhuizen
-  // -------------------------------------------------------
-  nwr["amenity"="hospital"](around:${radius},${latitude},${longitude});
+  const healthcare = String(
+    tags.healthcare || ""
+  ).toLowerCase();
 
-  // -------------------------------------------------------
-  // Klinieken
-  // -------------------------------------------------------
-  nwr["amenity"="clinic"](around:${radius},${latitude},${longitude});
+  const socialFacility = String(
+    tags.social_facility || ""
+  ).toLowerCase();
 
-  // -------------------------------------------------------
-  // Huisartsen / dokters
-  // -------------------------------------------------------
-  nwr["amenity"="doctors"](around:${radius},${latitude},${longitude});
+  const socialFor = String(
+    tags["social_facility:for"] || ""
+  ).toLowerCase();
 
-  // -------------------------------------------------------
-  // Apotheken
-  // -------------------------------------------------------
-  nwr["amenity"="pharmacy"](around:${radius},${latitude},${longitude});
+  const shop = String(
+    tags.shop || ""
+  ).toLowerCase();
 
-  // -------------------------------------------------------
-  // Scholen
-  // -------------------------------------------------------
-  nwr["amenity"="school"](around:${radius},${latitude},${longitude});
+  const tourism = String(
+    tags.tourism || ""
+  ).toLowerCase();
 
-  // -------------------------------------------------------
-  // Kinderopvang
-  // -------------------------------------------------------
-  nwr["amenity"="kindergarten"](around:${radius},${latitude},${longitude});
+  const schoolType = String(
+    tags["school:type"] || ""
+  ).toLowerCase();
 
-  // -------------------------------------------------------
-  // Kerken / gebedshuizen
-  // -------------------------------------------------------
-  nwr["amenity"="place_of_worship"](around:${radius},${latitude},${longitude});
+  const schoolSpecialNeeds = String(
+    tags["school:special_needs"] || ""
+  ).toLowerCase();
 
-  // -------------------------------------------------------
-  // Buurt- en gemeenschapscentra
-  // -------------------------------------------------------
-  nwr["amenity"="community_centre"](around:${radius},${latitude},${longitude});
+  const education = String(
+    tags.education || ""
+  ).toLowerCase();
 
-  // -------------------------------------------------------
-  // Supermarkten
-  // -------------------------------------------------------
-  nwr["shop"="supermarket"](around:${radius},${latitude},${longitude});
+  const description = String(
+    tags.description || ""
+  ).toLowerCase();
 
-  // -------------------------------------------------------
-  // Hotels
-  // -------------------------------------------------------
-  nwr["tourism"="hotel"](around:${radius},${latitude},${longitude});
-);
+  const name = String(
+    tags.name || ""
+  ).toLowerCase();
 
-out center tags;
-`;
+  /*
+   * =========================
+   * ZORG
+   * =========================
+   */
+
+  if (amenity === "hospital") {
+    return "hospital";
+  }
+
+  if (amenity === "clinic") {
+    return "clinic";
+  }
+
+  if (
+    healthcare === "psychiatry" ||
+    healthcare === "mental_health" ||
+    healthcare === "psychology" ||
+    socialFacility === "mental_health"
+  ) {
+    return "mental_health";
+  }
+
+  if (
+    socialFacility === "nursing_home" ||
+    healthcare === "nursing_home"
+  ) {
+    return "nursing_home";
+  }
+
+  if (
+    socialFacility === "care_home" ||
+    healthcare === "care_home"
+  ) {
+    return "care_home";
+  }
+
+  if (
+    socialFacility === "assisted_living" ||
+    socialFacility === "residential_care"
+  ) {
+    return "assisted_living";
+  }
+
+  if (
+    socialFacility === "group_home" ||
+    socialFacility === "group_home_for_disabled"
+  ) {
+    return "group_home";
+  }
+
+  if (
+    socialFacility === "hospice" ||
+    healthcare === "hospice"
+  ) {
+    return "hospice";
+  }
+
+  if (
+    socialFacility === "disability_care" ||
+    (
+      socialFacility === "workshop" &&
+      (
+        socialFor.includes("disabled") ||
+        socialFor.includes("disability")
+      )
+    )
+  ) {
+    return "disability_care";
+  }
+
+  if (
+    socialFacility === "day_care" ||
+    socialFacility === "daycare"
+  ) {
+    return "day_care";
+  }
+
+  if (
+    socialFacility === "shelter" ||
+    socialFacility === "refugee_shelter" ||
+    socialFacility === "homeless_shelter"
+  ) {
+    return "shelter";
+  }
+
+  if (
+    socialFacility === "ambulatory_care" ||
+    socialFacility === "outreach"
+  ) {
+    return "home_care";
+  }
+
+  if (
+    socialFacility === "care" ||
+    socialFacility === "social_service" ||
+    socialFacility === "social_centre"
+  ) {
+    return "other_care";
+  }
+
+  /*
+   * =========================
+   * ONDERWIJS
+   * =========================
+   */
+
+  if (amenity === "school") {
+    const isSpecialEducation =
+      schoolSpecialNeeds === "only" ||
+      schoolSpecialNeeds.includes("special") ||
+      schoolType === "special" ||
+      schoolType === "special_education" ||
+      education === "special" ||
+      education === "special_education" ||
+      description.includes("speciaal onderwijs") ||
+      description.includes(
+        "voortgezet speciaal onderwijs"
+      ) ||
+      description.includes(
+        "speciaal basisonderwijs"
+      ) ||
+      description.includes(
+        "praktijkonderwijs"
+      ) ||
+      name.includes(
+        "speciaal onderwijs"
+      );
+
+    if (isSpecialEducation) {
+      return "special_school";
+    }
+
+    return "school";
+  }
+
+  /*
+   * Kinderopvang
+   */
+
+  if (
+    amenity === "kindergarten" ||
+    amenity === "childcare" ||
+    socialFacility === "child_daycare"
+  ) {
+    return "kindergarten";
+  }
+
+  /*
+   * =========================
+   * MAATSCHAPPELIJK
+   * =========================
+   */
+
+  if (amenity === "place_of_worship") {
+    return "church";
+  }
+
+  /*
+   * Sportverenigingen blijven
+   * onderdeel van de resultaten.
+   */
+
+  if (
+    amenity === "community_centre" ||
+    amenity === "social_centre"
+  ) {
+    return "community";
+  }
+
+  /*
+   * =========================
+   * OVERIG
+   * =========================
+   */
+
+  if (
+    tourism === "hotel" ||
+    tourism === "hostel"
+  ) {
+    return "hotel";
+  }
+
+  if (shop === "supermarket") {
+    return "supermarket";
+  }
+
+  if (
+    shop === "mall" ||
+    amenity === "shopping_centre"
+  ) {
+    return "shopping_centre";
+  }
+
+  if (
+    amenity === "marketplace" ||
+    shop === "marketplace"
+  ) {
+    return "marketplace";
+  }
+
+  /*
+   * Algemene winkels worden voorlopig
+   * nog NIET meegenomen.
+   */
+
+  return null;
 }
 
-// ---------------------------------------------------------
-// Overpass ophalen
-// ---------------------------------------------------------
+/*
+ * =========================
+ * PRIORITEIT
+ * =========================
+ */
+
+function getPriority(type) {
+  const priorities = {
+    hospital: 1,
+
+    nursing_home: 2,
+    care_home: 3,
+    assisted_living: 4,
+    group_home: 5,
+    disability_care: 6,
+    mental_health: 7,
+    hospice: 8,
+    clinic: 9,
+    home_care: 10,
+    other_care: 11,
+    shelter: 12,
+
+    special_school: 20,
+    school: 21,
+    kindergarten: 22,
+
+    church: 30,
+    community: 31,
+
+    hotel: 40,
+    supermarket: 41,
+    shopping_centre: 42,
+    marketplace: 43,
+  };
+
+  return priorities[type] || 99;
+}
+
+/*
+ * =========================
+ * OVERPASS QUERY
+ * =========================
+ */
+
 async function queryOverpass(query) {
   let lastError = null;
 
-  for (const url of OVERPASS_URLS) {
+  for (const server of OVERPASS_SERVERS) {
+    const controller =
+      new AbortController();
+
+    // Maximaal 15 seconden wachten
+    // op één Overpass-server.
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, 15000);
+
     try {
-      console.log(`Overpass proberen: ${url}`);
+      console.log(
+        `Overpass proberen: ${server}`
+      );
 
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json",
-          "User-Agent": "Omgevingsscan/1.0",
-        },
-        body: new URLSearchParams({
+      /*
+       * Zelfde POST-formaat als de werkende curl.
+       */
+
+      const body =
+        new URLSearchParams({
           data: query,
-        }).toString(),
-      });
+        }).toString();
 
-      const text = await response.text();
+      const response = await fetch(
+        server,
+        {
+          method: "POST",
 
-      console.log(`Overpass status: ${response.status}`);
+          headers: {
+            "Content-Type":
+              "application/x-www-form-urlencoded",
+
+            "User-Agent":
+              "Omgevingsscan/1.0",
+          },
+
+          body,
+
+          signal:
+            controller.signal,
+        }
+      );
+
+      /*
+       * Timeout stoppen zodra er antwoord is.
+       */
+
+      clearTimeout(timeout);
+
+      /*
+       * Server geeft bijvoorbeeld 429,
+       * 406, 502 of 504.
+       */
 
       if (!response.ok) {
-        lastError = new Error(
-          `Overpass HTTP ${response.status}: ${text.substring(0, 300)}`
+        const error =
+          new Error(
+            `Overpass HTTP ${response.status}`
+          );
+
+        console.error(
+          `Overpass fout bij ${server}: ${error.message}`
         );
+
+        lastError = error;
+
         continue;
       }
 
-      let data;
+      const data =
+        await response.json();
 
-      try {
-        data = JSON.parse(text);
-      } catch (error) {
-        lastError = new Error(
-          `Overpass gaf geen JSON terug: ${text.substring(0, 300)}`
-        );
-        continue;
-      }
-
-      if (!data || !Array.isArray(data.elements)) {
-        lastError = new Error("Ongeldig Overpass antwoord");
-        continue;
-      }
+      console.log(
+        `Overpass succesvol: ${server}`
+      );
 
       return data;
     } catch (error) {
-      console.error(`Overpass fout bij ${url}:`, error.message);
-      lastError = error;
+      clearTimeout(timeout);
+
+      if (
+        error.name ===
+        "AbortError"
+      ) {
+        console.error(
+          `Overpass timeout bij ${server}`
+        );
+
+        lastError =
+          new Error(
+            `Overpass timeout bij ${server}`
+          );
+      } else {
+        console.error(
+          `Overpass fout bij ${server}:`,
+          error.message
+        );
+
+        lastError = error;
+      }
     }
   }
 
-  throw lastError || new Error("Geen Overpass-server beschikbaar");
+  throw (
+    lastError ||
+    new Error(
+      "Alle Overpass servers mislukt"
+    )
+  );
 }
 
-// ---------------------------------------------------------
-// Vulnerable objects API
-// ---------------------------------------------------------
-app.get("/api/vulnerable-objects", async (req, res) => {
-  try {
-    const latitude = Number(req.query.latitude);
-    const longitude = Number(req.query.longitude);
-    const radius = Number(req.query.radius || 500);
+/*
+ * =========================
+ * VULNERABLE OBJECTS API
+ * =========================
+ */
 
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      return res.status(400).json({
-        error: "Ongeldige latitude of longitude",
-      });
-    }
+app.get(
+  "/api/vulnerable-objects",
+  async (req, res) => {
+    try {
+      const latitude = Number(
+        req.query.latitude
+      );
 
-    if (!Number.isFinite(radius) || radius <= 0) {
-      return res.status(400).json({
-        error: "Ongeldige radius",
-      });
-    }
+      const longitude = Number(
+        req.query.longitude
+      );
 
-    console.log(
-      `Omgevingsscan: lat=${latitude}, lon=${longitude}, radius=${radius}m`
-    );
+      const radius = Number(
+        req.query.radius || 500
+      );
 
-    const query = buildOverpassQuery(latitude, longitude, radius);
+      /*
+       * =========================
+       * CONTROLE INVOER
+       * =========================
+       */
 
-    const data = await queryOverpass(query);
-
-    const objects = [];
-
-    for (const element of data.elements) {
-      const tags = element.tags || {};
-
-      const type = getObjectType(tags);
-
-      if (!type) {
-        continue;
-      }
-
-      let objectLatitude = null;
-      let objectLongitude = null;
-
-      // Node
       if (
-        element.type === "node" &&
-        Number.isFinite(element.lat) &&
-        Number.isFinite(element.lon)
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude)
       ) {
-        objectLatitude = element.lat;
-        objectLongitude = element.lon;
-      }
-
-      // Way / relation met center
-      if (
-        element.center &&
-        Number.isFinite(element.center.lat) &&
-        Number.isFinite(element.center.lon)
-      ) {
-        objectLatitude = element.center.lat;
-        objectLongitude = element.center.lon;
+        return res.status(400).json({
+          error:
+            "latitude en longitude zijn verplicht",
+        });
       }
 
       if (
-        !Number.isFinite(objectLatitude) ||
-        !Number.isFinite(objectLongitude)
+        !Number.isFinite(radius) ||
+        radius <= 0
       ) {
-        continue;
+        return res.status(400).json({
+          error:
+            "radius moet groter zijn dan 0",
+        });
       }
 
-      // Extra veiligheidscontrole op afstand
-      const distance = distanceMeters(
-        latitude,
-        longitude,
-        objectLatitude,
-        objectLongitude
+      /*
+       * =========================
+       * OVERPASS QUERY
+       * =========================
+       */
+
+      const query = `
+        [out:json][timeout:50];
+
+        (
+          /*
+           * ZORG
+           */
+
+          nwr["social_facility"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["amenity"="hospital"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["amenity"="clinic"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["healthcare"="psychiatry"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["healthcare"="mental_health"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["healthcare"="psychology"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          /*
+           * ONDERWIJS
+           */
+
+          nwr["amenity"="school"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["amenity"="kindergarten"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["amenity"="childcare"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          /*
+           * MAATSCHAPPELIJK
+           */
+
+          nwr["amenity"="place_of_worship"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["amenity"="community_centre"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["amenity"="social_centre"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          /*
+           * OVERIG
+           */
+
+          nwr["tourism"="hotel"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["tourism"="hostel"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["shop"="supermarket"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["shop"="mall"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+
+          nwr["amenity"="marketplace"](
+            around:${radius},
+            ${latitude},
+            ${longitude}
+          );
+        );
+
+        out center tags;
+      `;
+
+      const data =
+        await queryOverpass(query);
+
+      const objects = [];
+
+      /*
+       * =========================
+       * RESULTATEN VERWERKEN
+       * =========================
+       */
+
+      for (
+        const element of
+          data.elements || []
+      ) {
+        const tags =
+          element.tags || {};
+
+        const type =
+          getObjectType(tags);
+
+        /*
+         * Niet relevant.
+         */
+
+        if (!type) {
+          continue;
+        }
+
+        let objectLatitude = null;
+        let objectLongitude = null;
+
+        /*
+         * NODE
+         */
+
+        if (
+          element.type === "node" &&
+          Number.isFinite(element.lat) &&
+          Number.isFinite(element.lon)
+        ) {
+          objectLatitude =
+            element.lat;
+
+          objectLongitude =
+            element.lon;
+        }
+
+        /*
+         * WAY / RELATION
+         */
+
+        else if (
+          element.center &&
+          Number.isFinite(
+            element.center.lat
+          ) &&
+          Number.isFinite(
+            element.center.lon
+          )
+        ) {
+          objectLatitude =
+            element.center.lat;
+
+          objectLongitude =
+            element.center.lon;
+        }
+
+        /*
+         * Geen bruikbare positie.
+         */
+
+        if (
+          !Number.isFinite(
+            objectLatitude
+          ) ||
+          !Number.isFinite(
+            objectLongitude
+          )
+        ) {
+          continue;
+        }
+
+        /*
+         * =========================
+         * AFSTAND
+         * =========================
+         */
+
+        const distance =
+          distanceMeters(
+            latitude,
+            longitude,
+            objectLatitude,
+            objectLongitude
+          );
+
+        /*
+         * Extra radiuscontrole.
+         */
+
+        if (distance > radius) {
+          continue;
+        }
+
+        objects.push({
+          id:
+            `${element.type}-${element.id}`,
+
+          name:
+            getObjectName(tags),
+
+          type,
+
+          latitude:
+            objectLatitude,
+
+          longitude:
+            objectLongitude,
+
+          distance:
+            Math.round(distance),
+
+          tags,
+        });
+      }
+
+      /*
+       * =========================
+       * DUBBELE OBJECTEN VERWIJDEREN
+       * =========================
+       */
+
+      const uniqueObjects =
+        Array.from(
+          new Map(
+            objects.map(
+              (object) => [
+                object.id,
+                object,
+              ]
+            )
+          ).values()
+        );
+
+      /*
+       * =========================
+       * SORTEREN
+       * =========================
+       */
+
+      uniqueObjects.sort(
+        (a, b) => {
+          const priorityDifference =
+            getPriority(a.type) -
+            getPriority(b.type);
+
+          if (
+            priorityDifference !== 0
+          ) {
+            return priorityDifference;
+          }
+
+          return (
+            a.distance -
+            b.distance
+          );
+        }
       );
 
-      if (distance > radius) {
-        continue;
-      }
+      /*
+       * =========================
+       * RESPONSE
+       * =========================
+       */
 
-      objects.push({
-        id: `${element.type}-${element.id}`,
-        name: getObjectName(tags),
-        type,
-        latitude: objectLatitude,
-        longitude: objectLongitude,
+      res.json(uniqueObjects);
+    } catch (error) {
+      console.error(
+        "Fout bij vulnerable-objects:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Kon kwetsbare/relevante objecten niet ophalen",
+
+        details:
+          error.message,
       });
     }
+  }
+);
 
-    // -------------------------------------------------------
-    // Dubbelen verwijderen
-    // -------------------------------------------------------
-    const uniqueObjects = Array.from(
-      new Map(objects.map((object) => [object.id, object])).values()
-    );
+/*
+ * =========================
+ * HEALTH CHECK
+ * =========================
+ */
 
-    // -------------------------------------------------------
-    // Sorteer op afstand vanaf incident
-    // -------------------------------------------------------
-    uniqueObjects.sort((a, b) => {
-      const distanceA = distanceMeters(
-        latitude,
-        longitude,
-        a.latitude,
-        a.longitude
-      );
-
-      const distanceB = distanceMeters(
-        latitude,
-        longitude,
-        b.latitude,
-        b.longitude
-      );
-
-      return distanceA - distanceB;
-    });
-
-    console.log(
-      `Aantal gevonden objecten: ${uniqueObjects.length}`
-    );
-
-    return res.json(uniqueObjects);
-  } catch (error) {
-    console.error("Vulnerable objects fout:", error);
-
-    return res.status(500).json({
-      error: "Geen geldig antwoord van Overpass",
-      details: error.message,
+app.get(
+  "/api/health",
+  (req, res) => {
+    res.json({
+      status: "ok",
     });
   }
-});
+);
 
-// ---------------------------------------------------------
-// Health check
-// ---------------------------------------------------------
-app.get("/api/health", (req, res) => {
-  res.json({
-    status: "ok",
-    service: "omgevingsscan-backend",
-  });
-});
+/*
+ * =========================
+ * SERVER START
+ * =========================
+ */
 
-// ---------------------------------------------------------
-// Server starten
-// ---------------------------------------------------------
-app.listen(PORT, () => {
-  console.log(`Backend draait op http://localhost:${PORT}`);
-});
+app.listen(
+  PORT,
+  () => {
+    console.log(
+      `Omgevingsscan backend draait op poort ${PORT}`
+    );
+  }
+);
