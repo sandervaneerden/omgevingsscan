@@ -7,6 +7,7 @@ import MapView from "./components/MapView";
 
 import {
   getWeather,
+  getBeaufort,
 } from "./services/weatherService";
 
 import type {
@@ -819,6 +820,34 @@ const categoryOrder: Category[] = [
 
 
 /* =========================================================
+   KOPIËREN NAAR KLEMBORD
+   ========================================================= */
+
+async function copyToClipboard(
+  text: string
+): Promise<boolean> {
+
+  try {
+
+    await navigator.clipboard.writeText(
+      text
+    );
+
+    return true;
+
+  } catch (error) {
+
+    console.error(
+      "❌ Kopiëren naar klembord mislukt:",
+      error
+    );
+
+    return false;
+  }
+}
+
+
+/* =========================================================
    APP
    ========================================================= */
 
@@ -890,6 +919,20 @@ function App() {
     Verblijf: true,
     Overig: true,
   });
+
+
+  /* =======================================================
+     KOPIEERSTATUS
+     ======================================================= */
+
+  const [
+    copiedSection,
+    setCopiedSection
+  ] = useState<
+    "weather" |
+    "objects" |
+    null
+  >(null);
 
 
   /* =======================================================
@@ -1202,6 +1245,207 @@ function App() {
 
 
   /* =========================================================
+     METEO KOPIËREN
+     ========================================================= */
+
+  async function copyWeather() {
+
+    if (!weather) {
+      return;
+    }
+
+
+    const windSpeedKmh =
+      weather.windSpeed;
+
+    const windSpeedMs =
+      windSpeedKmh / 3.6;
+
+
+    const beaufort =
+      getBeaufort(
+        windSpeedKmh
+      );
+
+
+    const windDirectionDegrees =
+      Number(
+        weather.windDirection
+      );
+
+
+    const windDirection =
+      Number.isFinite(
+        windDirectionDegrees
+      )
+        ? `${weather.windDirectionText} (${Math.round(windDirectionDegrees)}°)`
+        : weather.windDirectionText;
+
+
+    const text = [
+      "METEOSITUATIE",
+      "",
+      `Windkracht: ${beaufort} Beaufort`,
+      `Windsnelheid: ${windSpeedKmh.toFixed(1)} km/u (${windSpeedMs.toFixed(1)} m/s)`,
+      `Windrichting: ${windDirection}`,
+      `Temperatuur: ${weather.temperature} °C`,
+      `Meting: ${weather.measurementTime}`,
+      "Bron: Open-Meteo",
+    ].join("\n");
+
+
+    const success =
+      await copyToClipboard(
+        text
+      );
+
+
+    if (!success) {
+      return;
+    }
+
+
+    setCopiedSection(
+      "weather"
+    );
+
+
+    window.setTimeout(
+      () => {
+        setCopiedSection(null);
+      },
+      2000
+    );
+  }
+
+
+  /* =========================================================
+     OBJECTEN KOPIËREN
+     ========================================================= */
+
+  async function copyObjects() {
+
+    if (
+      visibleObjects.length === 0
+    ) {
+      return;
+    }
+
+
+    const lines: string[] = [
+      "KWETSBARE OBJECTEN",
+      "",
+      `Incidentlocatie: ${location.address}`,
+      "",
+    ];
+
+
+    categoryOrder.forEach(
+      category => {
+
+        const categoryObjects =
+          groupedObjects[category];
+
+
+        if (
+          !categoryObjects ||
+          categoryObjects.length === 0
+        ) {
+
+          return;
+        }
+
+
+        const sortedObjects =
+          [...categoryObjects].sort(
+            (a, b) => {
+
+              const distanceA =
+                distanceInMeters(
+                  location.latitude,
+                  location.longitude,
+                  a.latitude,
+                  a.longitude
+                );
+
+
+              const distanceB =
+                distanceInMeters(
+                  location.latitude,
+                  location.longitude,
+                  b.latitude,
+                  b.longitude
+                );
+
+
+              return distanceA - distanceB;
+            }
+          );
+
+
+        lines.push(
+          `${category} (${sortedObjects.length})`
+        );
+
+
+        sortedObjects.forEach(
+          object => {
+
+            const distance =
+              distanceInMeters(
+                location.latitude,
+                location.longitude,
+                object.latitude,
+                object.longitude
+              );
+
+
+            const formattedDistance =
+              distance < 1000
+                ? `${Math.round(distance)} m`
+                : `${(
+                    distance / 1000
+                  ).toFixed(1)} km`;
+
+
+            lines.push(
+              `- ${object.name} — ${objectTypeName(object.type)} — ${formattedDistance}`
+            );
+          }
+        );
+
+
+        lines.push("");
+      }
+    );
+
+
+    const success =
+      await copyToClipboard(
+        lines.join("\n")
+      );
+
+
+    if (!success) {
+      return;
+    }
+
+
+    setCopiedSection(
+      "objects"
+    );
+
+
+    window.setTimeout(
+      () => {
+        setCopiedSection(null);
+      },
+      2000
+    );
+  }
+
+
+  /* =========================================================
      RENDER
      ========================================================= */
 
@@ -1268,11 +1512,37 @@ function App() {
 
       <main className="dashboard">
 
+        {/* =================================================
+            WEERSITUATIE
+            ================================================= */}
+
         <section className="panel weather-panel">
 
-          <h2>
-            Weersituatie
-          </h2>
+          <div className="panel-title-row">
+
+            <h2>
+              Weersituatie
+            </h2>
+
+            {weather && (
+
+              <button
+                type="button"
+                className="copy-button"
+                onClick={copyWeather}
+              >
+
+                {copiedSection === "weather"
+                  ? "✓ Gekopieerd"
+                  : "📋 Kopiëren"
+                }
+
+              </button>
+
+            )}
+
+          </div>
+
 
           <WeatherPanel
             weather={weather}
@@ -1280,6 +1550,10 @@ function App() {
 
         </section>
 
+
+        {/* =================================================
+            KWETSBARE OBJECTEN
+            ================================================= */}
 
         <section className="panel objects-panel">
 
@@ -1289,14 +1563,37 @@ function App() {
               Kwetsbare objecten
             </h2>
 
-            <span className="object-total">
 
-              {objectsLoading
-                ? "..."
-                : totalVisibleObjects
-              }
+            <div className="panel-title-actions">
 
-            </span>
+              <button
+                type="button"
+                className="copy-button"
+                onClick={copyObjects}
+                disabled={
+                  objectsLoading ||
+                  totalVisibleObjects === 0
+                }
+              >
+
+                {copiedSection === "objects"
+                  ? "✓ Gekopieerd"
+                  : "📋 Kopiëren"
+                }
+
+              </button>
+
+
+              <span className="object-total">
+
+                {objectsLoading
+                  ? "..."
+                  : totalVisibleObjects
+                }
+
+              </span>
+
+            </div>
 
           </div>
 
@@ -1360,6 +1657,7 @@ function App() {
                             a.longitude
                           );
 
+
                         const distanceB =
                           distanceInMeters(
                             location.latitude,
@@ -1367,6 +1665,7 @@ function App() {
                             b.latitude,
                             b.longitude
                           );
+
 
                         return distanceA - distanceB;
                       }
@@ -1504,6 +1803,10 @@ function App() {
 
         </section>
 
+
+        {/* =================================================
+            KAART
+            ================================================= */}
 
         <section className="panel map-panel">
 
