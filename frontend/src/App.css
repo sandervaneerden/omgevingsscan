@@ -717,7 +717,7 @@
 .copy-button {
   border: 1px solid #388e3c;
   background: #388e3c;
-  color: white;
+  color: black;
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 13px;
@@ -729,7 +729,6 @@
     border-color 0.15s ease,
     opacity 0.15s ease;
 }
-
 
 .copy-button:hover:not(:disabled) {
   background: #2e7d32;
