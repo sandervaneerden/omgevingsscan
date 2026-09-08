@@ -240,30 +240,87 @@ function labelForType(
    ICOON
    ========================================================= */
 
-function iconForType(
-  type: string
-): L.DivIcon {
+function iconForType(type: string) {
 
-  let emoji = "📍";
+  let icon = `
+    <svg
+      viewBox="0 0 32 32"
+      width="30"
+      height="30"
+    >
+      <circle
+        cx="16"
+        cy="16"
+        r="11"
+        fill="#607d8b"
+      />
+
+      <circle
+        cx="16"
+        cy="16"
+        r="4"
+        fill="white"
+      />
+    </svg>
+  `;
+
 
   switch (type) {
 
+    /* =====================================================
+       ZIEKENHUIS
+       ===================================================== */
+
     case "hospital":
     case "clinic":
-      emoji = "🏥";
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <rect
+            x="5"
+            y="4"
+            width="22"
+            height="24"
+            rx="2"
+            fill="#d32f2f"
+          />
+
+          <rect
+            x="13"
+            y="8"
+            width="6"
+            height="16"
+            fill="white"
+          />
+
+          <rect
+            x="8"
+            y="13"
+            width="16"
+            height="6"
+            fill="white"
+          />
+
+        </svg>
+      `;
+
       break;
+
+
+    /* =====================================================
+       ZORG
+       ===================================================== */
 
     case "healthcare":
     case "care":
     case "nursing_home":
     case "care_home":
     case "residential_care":
-    case "disability_care":
-    case "mental_health":
-    case "hospice":
-    case "rehabilitation":
-    case "home_care":
-    case "other_care":
     case "doctor":
     case "doctors":
     case "dentist":
@@ -271,23 +328,142 @@ function iconForType(
     case "physiotherapist":
     case "physiotherapy":
     case "psychologist":
-      emoji = "⚕️";
+    case "mental_health":
+    case "disability_care":
+    case "hospice":
+    case "rehabilitation":
+    case "home_care":
+    case "other_care":
+
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <circle
+            cx="16"
+            cy="16"
+            r="13"
+            fill="#1976d2"
+          />
+
+          <path
+            d="M16 8V24"
+            stroke="white"
+            stroke-width="3"
+            stroke-linecap="round"
+          />
+
+          <path
+            d="M8 16H24"
+            stroke="white"
+            stroke-width="3"
+            stroke-linecap="round"
+          />
+
+        </svg>
+      `;
+
       break;
+
+
+    /* =====================================================
+       ONDERWIJS
+       ===================================================== */
 
     case "school":
     case "kindergarten":
     case "childcare":
     case "college":
     case "university":
-      emoji = "🎓";
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <path
+            d="M3 13L16 4L29 13L16 22L3 13Z"
+            fill="#f9a825"
+          />
+
+          <path
+            d="M8 16V27H24V16"
+            fill="#f9a825"
+          />
+
+          <rect
+            x="13"
+            y="20"
+            width="6"
+            height="7"
+            fill="white"
+          />
+
+        </svg>
+      `;
+
       break;
+
+
+    /* =====================================================
+       RELIGIE
+       ===================================================== */
 
     case "church":
     case "place_of_worship":
     case "mosque":
     case "synagogue":
-      emoji = "⛪";
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <path
+            d="M6 27H26"
+            stroke="#7b1fa2"
+            stroke-width="2"
+          />
+
+          <path
+            d="M9 27V15H23V27"
+            fill="#7b1fa2"
+          />
+
+          <path
+            d="M7 15H25L16 7L7 15Z"
+            fill="#7b1fa2"
+          />
+
+          <path
+            d="M16 3V10"
+            stroke="#7b1fa2"
+            stroke-width="2"
+          />
+
+          <path
+            d="M13 6H19"
+            stroke="#7b1fa2"
+            stroke-width="2"
+          />
+
+        </svg>
+      `;
+
       break;
+
+
+    /* =====================================================
+       WINKEL
+       ===================================================== */
 
     case "shop":
     case "supermarket":
@@ -295,51 +471,176 @@ function iconForType(
     case "shopping_centre":
     case "mall":
     case "hardware_store":
-      emoji = "🛒";
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <path
+            d="M5 12L7 5H25L27 12Z"
+            fill="#ef6c00"
+          />
+
+          <rect
+            x="6"
+            y="12"
+            width="20"
+            height="15"
+            fill="#fb8c00"
+          />
+
+          <rect
+            x="11"
+            y="18"
+            width="10"
+            height="9"
+            fill="white"
+          />
+
+        </svg>
+      `;
+
       break;
+
+
+    /* =====================================================
+       MAATSCHAPPELIJK
+       ===================================================== */
 
     case "community":
     case "community_centre":
-      emoji = "🏢";
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <path
+            d="M4 14L16 5L28 14V27H4V14Z"
+            fill="#388e3c"
+          />
+
+          <rect
+            x="9"
+            y="17"
+            width="5"
+            height="6"
+            fill="white"
+          />
+
+          <rect
+            x="18"
+            y="17"
+            width="5"
+            height="6"
+            fill="white"
+          />
+
+        </svg>
+      `;
+
       break;
+
+
+    /* =====================================================
+       HOTEL / VERBLIJF
+       ===================================================== */
 
     case "hotel":
-      emoji = "🏨";
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <rect
+            x="5"
+            y="5"
+            width="22"
+            height="22"
+            rx="2"
+            fill="#00838f"
+          />
+
+          <rect
+            x="9"
+            y="10"
+            width="4"
+            height="4"
+            fill="white"
+          />
+
+          <rect
+            x="19"
+            y="10"
+            width="4"
+            height="4"
+            fill="white"
+          />
+
+          <rect
+            x="9"
+            y="17"
+            width="4"
+            height="4"
+            fill="white"
+          />
+
+          <rect
+            x="19"
+            y="17"
+            width="4"
+            height="4"
+            fill="white"
+          />
+
+          <rect
+            x="14"
+            y="20"
+            width="4"
+            height="7"
+            fill="white"
+          />
+
+        </svg>
+      `;
+
       break;
 
-    case "sport":
-    case "sports_centre":
-    case "stadium":
-      emoji = "🏟️";
-      break;
-
-    case "marketplace":
-      emoji = "🛍️";
-      break;
   }
 
+
   return L.divIcon({
-    className: "vulnerable-object-marker",
 
     html: `
-      <div style="
-        font-size: 24px;
-        line-height: 30px;
-        text-align: center;
-        width: 30px;
-        height: 30px;
-        background: white;
-        border-radius: 50%;
-        border: 2px solid #333;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-      ">
-        ${emoji}
+      <div
+        style="
+          width: 30px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        "
+      >
+        ${icon}
       </div>
     `,
 
+    className: "",
+
     iconSize: [30, 30],
+
     iconAnchor: [15, 15],
-    popupAnchor: [0, -15],
+
+    popupAnchor: [0, -15]
+
   });
 }
 
