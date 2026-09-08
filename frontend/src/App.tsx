@@ -144,6 +144,10 @@ function categoryForType(
 
   switch (type) {
 
+    /* -----------------------------------------------------
+       ZORG
+       ----------------------------------------------------- */
+
     case "hospital":
     case "healthcare":
     case "nursing_home":
@@ -151,28 +155,57 @@ function categoryForType(
     case "residential_care":
     case "care":
     case "clinic":
+
+    case "doctor":
     case "doctors":
+
     case "dentist":
+
     case "pharmacy":
+
     case "physiotherapist":
+    case "physiotherapy":
+
     case "psychologist":
+
+    case "mental_health":
+    case "disability_care":
+    case "hospice":
+    case "rehabilitation":
+    case "home_care":
+    case "other_care":
+
       return "Zorg";
 
+
+    /* -----------------------------------------------------
+       ONDERWIJS
+       ----------------------------------------------------- */
 
     case "school":
     case "kindergarten":
     case "college":
     case "university":
     case "childcare":
+
       return "Onderwijs";
 
+
+    /* -----------------------------------------------------
+       RELIGIE
+       ----------------------------------------------------- */
 
     case "church":
     case "place_of_worship":
     case "mosque":
     case "synagogue":
+
       return "Religie";
 
+
+    /* -----------------------------------------------------
+       WINKELS
+       ----------------------------------------------------- */
 
     case "shop":
     case "supermarket":
@@ -180,19 +213,35 @@ function categoryForType(
     case "shopping_centre":
     case "mall":
     case "hardware_store":
+
       return "Winkels";
 
 
+    /* -----------------------------------------------------
+       MAATSCHAPPELIJK
+       ----------------------------------------------------- */
+
     case "community":
     case "community_centre":
+
       return "Maatschappelijk";
 
 
+    /* -----------------------------------------------------
+       VERBLIJF
+       ----------------------------------------------------- */
+
     case "hotel":
+
       return "Verblijf";
 
 
+    /* -----------------------------------------------------
+       OVERIG
+       ----------------------------------------------------- */
+
     default:
+
       return "Overig";
   }
 }
@@ -207,6 +256,10 @@ function objectTypeName(
 ): string {
 
   switch (type) {
+
+    /* -----------------------------------------------------
+       ZORG
+       ----------------------------------------------------- */
 
     case "hospital":
       return "Ziekenhuis";
@@ -229,6 +282,7 @@ function objectTypeName(
     case "clinic":
       return "Kliniek";
 
+    case "doctor":
     case "doctors":
       return "Huisarts";
 
@@ -241,9 +295,34 @@ function objectTypeName(
     case "physiotherapist":
       return "Fysiotherapeut";
 
+    case "physiotherapy":
+      return "Fysiotherapie";
+
     case "psychologist":
       return "Psycholoog";
 
+    case "mental_health":
+      return "Geestelijke gezondheidszorg (GGZ)";
+
+    case "disability_care":
+      return "Gehandicaptenzorg";
+
+    case "hospice":
+      return "Hospice / palliatieve zorg";
+
+    case "rehabilitation":
+      return "Revalidatie";
+
+    case "home_care":
+      return "Thuiszorg";
+
+    case "other_care":
+      return "Zorgvoorziening";
+
+
+    /* -----------------------------------------------------
+       ONDERWIJS
+       ----------------------------------------------------- */
 
     case "school":
       return "School";
@@ -261,6 +340,10 @@ function objectTypeName(
       return "Universiteit";
 
 
+    /* -----------------------------------------------------
+       RELIGIE
+       ----------------------------------------------------- */
+
     case "church":
       return "Kerk";
 
@@ -273,6 +356,10 @@ function objectTypeName(
     case "synagogue":
       return "Synagoge";
 
+
+    /* -----------------------------------------------------
+       WINKELS
+       ----------------------------------------------------- */
 
     case "supermarket":
       return "Supermarkt";
@@ -293,6 +380,10 @@ function objectTypeName(
       return "Winkel";
 
 
+    /* -----------------------------------------------------
+       MAATSCHAPPELIJK
+       ----------------------------------------------------- */
+
     case "community":
       return "Maatschappelijke instelling";
 
@@ -300,9 +391,17 @@ function objectTypeName(
       return "Buurt- / wijkcentrum";
 
 
+    /* -----------------------------------------------------
+       VERBLIJF
+       ----------------------------------------------------- */
+
     case "hotel":
       return "Hotel";
 
+
+    /* -----------------------------------------------------
+       OVERIG
+       ----------------------------------------------------- */
 
     default:
       return "Overig";
@@ -370,6 +469,19 @@ function iconForType(
     case "nursing_home":
     case "care_home":
     case "residential_care":
+    case "disability_care":
+    case "mental_health":
+    case "hospice":
+    case "rehabilitation":
+    case "home_care":
+    case "other_care":
+    case "doctor":
+    case "doctors":
+    case "dentist":
+    case "pharmacy":
+    case "physiotherapist":
+    case "physiotherapy":
+    case "psychologist":
 
       return `
         <svg
@@ -396,117 +508,6 @@ function iconForType(
             stroke="white"
             stroke-width="3"
             stroke-linecap="round"
-          />
-        </svg>
-      `;
-
-
-    /* =====================================================
-       HUISARTS
-       ===================================================== */
-
-    case "doctors":
-
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <circle
-            cx="16"
-            cy="16"
-            r="13"
-            fill="#1976d2"
-          />
-
-          <path
-            d="M11 10V17C11 20 13 22 16 22C19 22 21 20 21 17V10"
-            fill="none"
-            stroke="white"
-            stroke-width="2.5"
-            stroke-linecap="round"
-          />
-
-          <path
-            d="M11 10H15"
-            stroke="white"
-            stroke-width="2.5"
-            stroke-linecap="round"
-          />
-
-          <path
-            d="M17 10H21"
-            stroke="white"
-            stroke-width="2.5"
-            stroke-linecap="round"
-          />
-        </svg>
-      `;
-
-
-    /* =====================================================
-       TANDARTS
-       ===================================================== */
-
-    case "dentist":
-
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <circle
-            cx="16"
-            cy="16"
-            r="13"
-            fill="#1976d2"
-          />
-
-          <path
-            d="M10 10C12 8 14 10 16 10C18 10 20 8 22 10C23 12 21 15 21 18C21 21 19 24 18 24C17 24 17 20 16 20C15 20 15 24 14 24C13 24 11 21 11 18C11 15 9 12 10 10Z"
-            fill="white"
-          />
-        </svg>
-      `;
-
-
-    /* =====================================================
-       APOTHEEK
-       ===================================================== */
-
-    case "pharmacy":
-
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <circle
-            cx="16"
-            cy="16"
-            r="13"
-            fill="#1976d2"
-          />
-
-          <rect
-            x="10"
-            y="13"
-            width="12"
-            height="6"
-            rx="2"
-            fill="white"
-          />
-
-          <rect
-            x="13"
-            y="10"
-            width="6"
-            height="12"
-            rx="2"
-            fill="white"
           />
         </svg>
       `;
