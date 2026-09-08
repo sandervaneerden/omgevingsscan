@@ -715,9 +715,9 @@
 
 
 .copy-button {
-  border: 1px solid #d0d7de;
-  background: #ffffff;
-  color: #374151;
+  border: 1px solid #388e3c;
+  background: #388e3c;
+  color: white;
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 13px;
@@ -727,22 +727,23 @@
   transition:
     background 0.15s ease,
     border-color 0.15s ease,
-    color 0.15s ease;
+    opacity 0.15s ease;
 }
 
 
 .copy-button:hover:not(:disabled) {
-  background: #f3f4f6;
-  border-color: #9ca3af;
+  background: #2e7d32;
+  border-color: #2e7d32;
 }
 
 
 .copy-button:active:not(:disabled) {
-  background: #e5e7eb;
+  background: #1b5e20;
+  border-color: #1b5e20;
 }
 
 
 .copy-button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
