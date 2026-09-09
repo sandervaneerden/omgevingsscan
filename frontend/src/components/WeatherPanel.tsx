@@ -97,8 +97,6 @@ function WeatherPanel({
 
   // =======================================================
   // WINDRICHTING
-  //
-  // De windrichting in graden komt uit de WeatherResult.
   // =======================================================
 
   const windDirectionDegrees =

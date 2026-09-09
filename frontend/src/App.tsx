@@ -544,10 +544,6 @@ function iconForType(
 
   switch (type) {
 
-    /* =====================================================
-       ZIEKENHUIS / KLINIEK
-       ===================================================== */
-
     case "hospital":
     case "clinic":
 
@@ -584,10 +580,6 @@ function iconForType(
         </svg>
       `;
 
-
-    /* =====================================================
-       ZORG
-       ===================================================== */
 
     case "healthcare":
     case "care":
@@ -630,10 +622,6 @@ function iconForType(
         </svg>
       `;
 
-
-    /* =====================================================
-       HUISARTS / TANDARTS / APOTHEEK
-       ===================================================== */
 
     case "doctors":
 
@@ -734,10 +722,6 @@ function iconForType(
       `;
 
 
-    /* =====================================================
-       ONDERWIJS
-       ===================================================== */
-
     case "school":
     case "kindergarten":
     case "childcare":
@@ -770,10 +754,6 @@ function iconForType(
         </svg>
       `;
 
-
-    /* =====================================================
-       RELIGIE
-       ===================================================== */
 
     case "church":
     case "place_of_worship":
@@ -817,10 +797,6 @@ function iconForType(
       `;
 
 
-    /* =====================================================
-       WINKEL
-       ===================================================== */
-
     case "shop":
     case "supermarket":
     case "department_store":
@@ -858,10 +834,6 @@ function iconForType(
       `;
 
 
-    /* =====================================================
-       MAATSCHAPPELIJK
-       ===================================================== */
-
     case "community":
     case "community_centre":
     case "social_facility":
@@ -895,10 +867,6 @@ function iconForType(
         </svg>
       `;
 
-
-    /* =====================================================
-       VERBLIJF
-       ===================================================== */
 
     case "hotel":
     case "hostel":
@@ -945,10 +913,6 @@ function iconForType(
         </svg>
       `;
 
-
-    /* =====================================================
-       OVERIG
-       ===================================================== */
 
     default:
 
@@ -1130,17 +1094,22 @@ function App() {
 
   /* =======================================================
      UITGEKLAPTE OBJECTEN
-
-     true = details zichtbaar
-     false = details verborgen
-
-     Standaard zijn alle objectdetails ingeklapt.
      ======================================================= */
 
   const [
     expandedObjects,
     setExpandedObjects
   ] = useState<Record<string, boolean>>({});
+
+
+  /* =======================================================
+     KOPIEERSTATUS OBJECTEN
+     ======================================================= */
+
+  const [
+    objectsCopied,
+    setObjectsCopied
+  ] = useState(false);
 
 
   /* =======================================================
@@ -1316,6 +1285,8 @@ function App() {
 
     setExpandedObjects({});
 
+    setObjectsCopied(false);
+
     setObjectsLoading(true);
 
 
@@ -1374,8 +1345,6 @@ function App() {
 
   /* =========================================================
      OBJECTEN FILTEREN OP 500 METER + GASZONE
-
-     Dit is de bestaande ruimtelijke filtering.
      ========================================================= */
 
   const spatiallyVisibleObjects =
@@ -1460,10 +1429,6 @@ function App() {
 
   /* =========================================================
      CATEGORIE FILTER
-
-     Eerst wordt de bestaande 500m/gaszone-filter toegepast.
-     Daarna wordt alleen gekeken welke categorieën zichtbaar
-     zijn.
      ========================================================= */
 
   const visibleObjects =
@@ -1518,6 +1483,260 @@ function App() {
 
   const totalVisibleObjects =
     visibleObjects.length;
+
+
+  /* =========================================================
+     OBJECTEN KOPIËREN
+     ========================================================= */
+
+  async function copyObjects() {
+
+    if (
+      visibleObjects.length === 0
+    ) {
+      return;
+    }
+
+
+    const lines: string[] = [];
+
+
+    lines.push(
+      "Kwetsbare objecten"
+    );
+
+
+    lines.push(
+      `Incidentlocatie: ${location.address}`
+    );
+
+
+    lines.push(
+      `Totaal: ${visibleObjects.length}`
+    );
+
+
+    lines.push("");
+
+
+    for (
+      const category of categoryOrder
+    ) {
+
+      const categoryObjects =
+        groupedObjects[category];
+
+
+      if (
+        !categoryObjects ||
+        categoryObjects.length === 0
+      ) {
+        continue;
+      }
+
+
+      lines.push(
+        `${category} (${categoryObjects.length})`
+      );
+
+
+      const sortedObjects =
+        [...categoryObjects].sort(
+          (a, b) => {
+
+            const distanceA =
+              distanceInMeters(
+                location.latitude,
+                location.longitude,
+                a.latitude,
+                a.longitude
+              );
+
+
+            const distanceB =
+              distanceInMeters(
+                location.latitude,
+                location.longitude,
+                b.latitude,
+                b.longitude
+              );
+
+
+            return distanceA - distanceB;
+          }
+        );
+
+
+      for (
+        const object of sortedObjects
+      ) {
+
+        const distance =
+          distanceInMeters(
+            location.latitude,
+            location.longitude,
+            object.latitude,
+            object.longitude
+          );
+
+
+        const phone =
+          getPhoneNumber(object);
+
+
+        const website =
+          getWebsite(object);
+
+
+        const address =
+          getObjectAddress(object);
+
+
+        const bag =
+          object.bag;
+
+
+        const pand =
+          object.pand;
+
+
+        lines.push(
+          `- ${object.name}`
+        );
+
+
+        lines.push(
+          `  Type: ${objectTypeName(object.type)}`
+        );
+
+
+        lines.push(
+          `  Afstand: ${
+            distance < 1000
+              ? `${Math.round(distance)} m`
+              : `${(distance / 1000).toFixed(1)} km`
+          }`
+        );
+
+
+        if (address) {
+
+          lines.push(
+            `  Adres: ${address}`
+          );
+
+        }
+
+
+        if (phone) {
+
+          lines.push(
+            `  Telefoon: ${phone}`
+          );
+
+        }
+
+
+        if (website) {
+
+          lines.push(
+            `  Website: ${website}`
+          );
+
+        }
+
+
+        if (
+          bag?.oppervlakte !== null &&
+          bag?.oppervlakte !== undefined
+        ) {
+
+          lines.push(
+            `  Oppervlakte: ${bag.oppervlakte} m²`
+          );
+
+        }
+
+
+        if (
+          pand?.bouwjaar !== null &&
+          pand?.bouwjaar !== undefined
+        ) {
+
+          lines.push(
+            `  Bouwjaar: ${pand.bouwjaar}`
+          );
+
+        }
+
+
+        if (
+          pand?.aantal_verblijfsobjecten !== null &&
+          pand?.aantal_verblijfsobjecten !== undefined
+        ) {
+
+          lines.push(
+            `  Verblijfsobjecten: ${pand.aantal_verblijfsobjecten}`
+          );
+
+        }
+
+
+        if (
+          pand?.gebruiksdoel
+        ) {
+
+          lines.push(
+            `  Gebruiksdoel: ${formatBAGUsePurpose(
+              pand.gebruiksdoel
+            )}`
+          );
+
+        }
+
+
+        if (
+          bag?.status
+        ) {
+
+          lines.push(
+            `  BAG-status: ${bag.status}`
+          );
+
+        }
+
+
+        lines.push("");
+      }
+
+
+      lines.push("");
+    }
+
+
+    try {
+
+      await navigator.clipboard.writeText(
+        lines.join("\n")
+      );
+
+
+      setObjectsCopied(true);
+
+
+      setTimeout(() => {
+        setObjectsCopied(false);
+      }, 1500);
+
+    } catch (error) {
+
+      console.error(
+        "❌ Objecten kopiëren mislukt:",
+        error
+      );
+
+    }
+  }
 
 
   /* =========================================================
@@ -1683,9 +1902,111 @@ function App() {
 
         <section className="panel weather-panel">
 
-          <h2>
-            Weersituatie
-          </h2>
+          <div className="panel-title-row">
+
+            <h2>
+              Weersituatie
+            </h2>
+
+
+            <button
+              type="button"
+              onClick={() => {
+
+                if (!weather) {
+                  return;
+                }
+
+
+                const windSpeedKmh =
+                  weather.windSpeed;
+
+
+                const windSpeedMs =
+                  windSpeedKmh / 3.6;
+
+
+                const beaufort =
+                  Math.floor(
+                    windSpeedKmh === 0
+                      ? 0
+                      : 0
+                  );
+
+
+                const windDirection =
+                  Number(
+                    weather.windDirection
+                  );
+
+
+                const directions = [
+                  "N",
+                  "NO",
+                  "O",
+                  "ZO",
+                  "Z",
+                  "ZW",
+                  "W",
+                  "NW"
+                ];
+
+
+                const directionText =
+                  `${directions[
+                    Math.round(
+                      windDirection / 45
+                    ) % 8
+                  ]} (${Math.round(
+                    windDirection
+                  )}°)`;
+
+
+                const text = [
+                  "Meteo",
+                  "",
+                  `Windkracht: ${beaufort} Beaufort`,
+                  `Windsnelheid: ${windSpeedKmh.toFixed(1)} km/u (${windSpeedMs.toFixed(1)} m/s)`,
+                  `Windrichting: ${directionText}`,
+                  `Temperatuur: ${weather.temperature} °C`,
+                  `Meting: ${weather.measurementTime}`,
+                  "Bron: Open-Meteo",
+                ].join("\n");
+
+
+                navigator.clipboard
+                  .writeText(text)
+                  .catch((error) => {
+                    console.error(
+                      "❌ Meteo kopiëren mislukt:",
+                      error
+                    );
+                  });
+
+              }}
+              disabled={!weather}
+              style={{
+                padding: "5px 9px",
+                borderRadius: "6px",
+                border: "1px solid #3f3f3f",
+                background:
+                  weather
+                    ? "#3f3f3f"
+                    : "#999999",
+                color: "#ffffff",
+                cursor:
+                  weather
+                    ? "pointer"
+                    : "default",
+                fontSize: "12px",
+                fontWeight: 400,
+              }}
+            >
+              📋 Kopiëren
+            </button>
+
+          </div>
+
 
           <WeatherPanel
             weather={weather}
@@ -1706,14 +2027,60 @@ function App() {
               Kwetsbare objecten
             </h2>
 
-            <span className="object-total">
 
-              {objectsLoading
-                ? "..."
-                : totalVisibleObjects
-              }
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
 
-            </span>
+              <button
+                type="button"
+                onClick={copyObjects}
+                disabled={
+                  objectsLoading ||
+                  totalVisibleObjects === 0
+                }
+                style={{
+                  padding: "5px 9px",
+                  borderRadius: "6px",
+                  border: "1px solid #3f3f3f",
+                  background:
+                    objectsCopied
+                      ? "#2e7d32"
+                      : objectsLoading ||
+                        totalVisibleObjects === 0
+                        ? "#999999"
+                        : "#3f3f3f",
+                  color: "#ffffff",
+                  cursor:
+                    objectsLoading ||
+                    totalVisibleObjects === 0
+                      ? "default"
+                      : "pointer",
+                  fontSize: "12px",
+                  fontWeight: 400,
+                }}
+              >
+                {objectsCopied
+                  ? "✓ Gekopieerd"
+                  : "📋 Kopiëren"
+                }
+              </button>
+
+
+              <span className="object-total">
+
+                {objectsLoading
+                  ? "..."
+                  : totalVisibleObjects
+                }
+
+              </span>
+
+            </div>
 
           </div>
 
@@ -1765,10 +2132,6 @@ function App() {
                   }
 
 
-                  /* -----------------------------------------
-                     SORTEREN OP AFSTAND
-                     ----------------------------------------- */
-
                   const sortedObjects =
                     [...categoryObjects].sort(
                       (a, b) => {
@@ -1809,10 +2172,6 @@ function App() {
                       key={category}
                     >
 
-                      {/* =================================
-                          CATEGORIEBALK
-                          ================================= */}
-
                       <button
                         type="button"
                         className="object-category-title"
@@ -1846,10 +2205,6 @@ function App() {
 
                       </button>
 
-
-                      {/* =================================
-                          OBJECTEN
-                          ================================= */}
 
                       {!isCollapsed && (
 
@@ -1990,10 +2345,6 @@ function App() {
 
                                   </div>
 
-
-                                  {/* =================================
-                                      EXTRA INFORMATIE
-                                      ================================= */}
 
                                   {expanded && hasExtraInformation && (
 
