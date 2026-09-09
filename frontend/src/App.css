@@ -746,36 +746,3 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
-.category-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.category-filter-button {
-  background: #f1f1f1;
-  color: #000000;
-  border: 1px solid #d0d0d0;
-  border-radius: 6px;
-  padding: 6px 10px;
-  cursor: pointer;
-  font-weight: normal;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.category-filter-button:hover {
-  background: #e5e5e5;
-}
-
-.category-filter-name {
-  color: #000000;
-  font-weight: normal;
-}
-
-.category-filter-checkbox {
-  font-size: 18px;
-  line-height: 1;
-  font-weight: normal;
-}

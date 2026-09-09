@@ -870,14 +870,11 @@ Incidentlocatie: ${location.address}
                             : `${category} tonen`
                         }
                       >
-                        <span
-  className="category-filter-checkbox"
-  style={{
-    color: enabled ? "#2e7d32" : "#000000",
-  }}
->
-  {enabled ? "☑" : "☐"}
-</span>
+                        <span className="category-filter-icon">
+                          {categoryIcon(
+                            category
+                          )}
+                        </span>
 
                         <span className="category-filter-name">
                           {category}
