@@ -780,6 +780,8 @@ function iconForType(
 
 /* =========================================================
    CATEGORIE ICOON
+   Gebruikt voor de objectcategorieën in de lijst.
+   Niet gebruikt voor de filterknoppen.
    ========================================================= */
 
 function categoryIcon(
@@ -885,10 +887,10 @@ function App() {
 
   /* =======================================================
      INGEKLAPTE CATEGORIEËN
-     
+
      true = ingeklapt
      false = open
-     
+
      Standaard staan alle categorieën ingeklapt.
      ======================================================= */
 
@@ -908,10 +910,10 @@ function App() {
 
   /* =======================================================
      FILTER CATEGORIEËN
-     
+
      true = zichtbaar
      false = verborgen
-     
+
      Standaard staan alle categorieën aan.
      ======================================================= */
 
@@ -1141,7 +1143,7 @@ function App() {
 
   /* =========================================================
      OBJECTEN FILTEREN OP 500 METER + GASZONE
-     
+
      Dit is de bestaande ruimtelijke filtering.
      ========================================================= */
 
@@ -1227,7 +1229,7 @@ function App() {
 
   /* =========================================================
      CATEGORIE FILTER
-     
+
      Eerst wordt de bestaande 500m/gaszone-filter toegepast.
      Daarna wordt alleen gekeken welke categorieën zichtbaar
      zijn.
@@ -1367,7 +1369,7 @@ function App() {
           style={{
             display: "flex",
             flexWrap: "wrap",
-            gap: "8px",
+            gap: "6px",
             marginTop: "14px",
             alignItems: "center",
           }}
@@ -1398,34 +1400,44 @@ function App() {
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: "6px",
-                    padding: "7px 12px",
-                    borderRadius: "7px",
+                    gap: "7px",
+                    padding: "6px 11px",
+                    borderRadius: "5px",
                     border: enabled
-                      ? "1px solid #1976d2"
-                      : "1px solid #c7c7c7",
+                      ? "1px solid #555"
+                      : "1px solid #aaa",
                     background: enabled
-                      ? "#e8f1fb"
-                      : "#f3f3f3",
+                      ? "#4a4a4a"
+                      : "#e4e4e4",
                     color: enabled
-                      ? "#174f85"
-                      : "#777",
+                      ? "#ffffff"
+                      : "#555555",
                     cursor: "pointer",
                     fontSize: "13px",
                     fontWeight: 600,
-                    opacity: enabled ? 1 : 0.65,
+                    lineHeight: 1.2,
+                    boxShadow: enabled
+                      ? "inset 0 1px 0 rgba(255,255,255,0.08)"
+                      : "none",
                     transition:
-                      "all 0.15s ease",
+                      "background 0.15s ease, border 0.15s ease, color 0.15s ease",
                   }}
                 >
 
                   <span
+                    aria-hidden="true"
                     style={{
-                      fontSize: "16px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "15px",
+                      height: "15px",
+                      fontSize: "14px",
+                      fontWeight: 700,
                       lineHeight: 1,
                     }}
                   >
-                    {categoryIcon(category)}
+                    {enabled ? "☑" : "☐"}
                   </span>
 
                   <span>
@@ -1679,7 +1691,8 @@ function App() {
                                       ? `${Math.round(distance)} m`
                                       : `${(
                                           distance / 1000
-                                        ).toFixed(1)} km`
+                                        ).toFixed(1)
+                                        } km`
                                     }
 
                                   </div>
