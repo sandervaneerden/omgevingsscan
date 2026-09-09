@@ -871,18 +871,13 @@ Incidentlocatie: ${location.address}
                         }
                       >
                         <span
-                          className="category-filter-checkbox"
-                          style={{
-                            color:
-                              enabled
-                                ? "#2e7d32"
-                                : "#000000",
-                          }}
-                        >
-                          {enabled
-                            ? "☑"
-                            : "☐"}
-                        </span>
+  className="category-filter-checkbox"
+  style={{
+    color: enabled ? "#2e7d32" : "#000000",
+  }}
+>
+  {enabled ? "☑" : "☐"}
+</span>
 
                         <span className="category-filter-name">
                           {category}
