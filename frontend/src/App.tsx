@@ -1,38 +1,17 @@
 import { useRef, useState } from "react";
 import "./App.css";
-
+import MapView from "./components/MapView";
 import SearchBar from "./components/SearchBar";
 import WeatherPanel from "./components/WeatherPanel";
-import MapView from "./components/MapView";
-
 import {
+  getBeaufort,
   getWeather,
 } from "./services/weatherService";
-
-import type {
-  WeatherResult,
-} from "./services/weatherService";
-
-import {
-  getVulnerableObjects,
-} from "./services/vulnerableObjectService";
-
-import type {
-  VulnerableObject,
-} from "./services/vulnerableObjectService";
-
-
-/* =========================================================
-   CONSTANTEN
-   ========================================================= */
+import { getVulnerableObjects } from "./services/vulnerableObjectService";
+import type { WeatherResult } from "./services/weatherService";
 
 const OBJECT_SEARCH_RADIUS = 3000;
 const OBJECT_CIRCLE_RADIUS = 500;
-
-
-/* =========================================================
-   CATEGORIEËN
-   ========================================================= */
 
 type Category =
   | "Zorg"
@@ -43,19 +22,29 @@ type Category =
   | "Verblijf"
   | "Overig";
 
+interface LocationData {
+  address: string;
+  latitude: number;
+  longitude: number;
+}
 
-/* =========================================================
-   AFSTAND BEREKENEN
-   ========================================================= */
+interface VulnerableObject {
+  id: string;
+  name: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+  distance?: number;
+  address?: string;
+}
 
 function distanceInMeters(
   lat1: number,
   lon1: number,
   lat2: number,
   lon2: number
-): number {
-
-  const earthRadius = 6371000;
+) {
+  const R = 6371000;
 
   const dLat =
     ((lat2 - lat1) * Math.PI) / 180;
@@ -78,23 +67,15 @@ function distanceInMeters(
       Math.sqrt(1 - a)
     );
 
-  return earthRadius * c;
+  return Math.round(R * c);
 }
 
-
-/* =========================================================
-   PUNT IN POLYGON
-   ========================================================= */
-
 function pointInPolygon(
-  latitude: number,
-  longitude: number,
+  point: [number, number],
   polygon: [number, number][]
-): boolean {
-
-  if (polygon.length < 3) {
-    return false;
-  }
+) {
+  const x = point[1];
+  const y = point[0];
 
   let inside = false;
 
@@ -103,29 +84,20 @@ function pointInPolygon(
     i < polygon.length;
     j = i++
   ) {
+    const xi = polygon[i][1];
+    const yi = polygon[i][0];
 
-    const latitudeI = polygon[i][0];
-    const longitudeI = polygon[i][1];
+    const xj = polygon[j][1];
+    const yj = polygon[j][0];
 
-    const latitudeJ = polygon[j][0];
-    const longitudeJ = polygon[j][1];
+    const intersect =
+      yi > y !== yj > y &&
+      x <
+        ((xj - xi) * (y - yi)) /
+          (yj - yi) +
+          xi;
 
-    const intersects =
-      (
-        (latitudeI > latitude) !==
-        (latitudeJ > latitude)
-      ) &&
-      (
-        longitude <
-        (
-          (longitudeJ - longitudeI) *
-            (latitude - latitudeI) /
-            (latitudeJ - latitudeI) +
-          longitudeI
-        )
-      );
-
-    if (intersects) {
+    if (intersect) {
       inside = !inside;
     }
   }
@@ -133,59 +105,39 @@ function pointInPolygon(
   return inside;
 }
 
-
-/* =========================================================
-   TYPE → CATEGORIE
-   ========================================================= */
-
 function categoryForType(
   type: string
 ): Category {
-
   switch (type) {
-
     case "hospital":
-    case "healthcare":
-    case "nursing_home":
-    case "care_home":
-    case "residential_care":
-    case "care":
     case "clinic":
-    case "doctors":
-    case "dentist":
-    case "pharmacy":
-    case "physiotherapist":
-    case "psychologist":
+      return "Zorg";
+
+    case "nursing_home":
     case "mental_health":
     case "disabled_care":
     case "protected_living":
     case "hospice":
     case "rehabilitation":
     case "home_care":
+    case "doctor":
+    case "dentist":
+    case "physiotherapy":
+    case "pharmacy":
+    case "healthcare":
+    case "care":
       return "Zorg";
 
     case "school":
     case "kindergarten":
-    case "college":
-    case "university":
-    case "childcare":
       return "Onderwijs";
 
-    case "church":
     case "place_of_worship":
-    case "mosque":
-    case "synagogue":
       return "Religie";
 
     case "shop":
-    case "supermarket":
-    case "department_store":
-    case "shopping_centre":
-    case "mall":
-    case "hardware_store":
       return "Winkels";
 
-    case "community":
     case "community_centre":
     case "social_facility":
       return "Maatschappelijk";
@@ -200,55 +152,19 @@ function categoryForType(
   }
 }
 
-
-/* =========================================================
-   TYPE → NEDERLANDSE NAAM
-   ========================================================= */
-
-function objectTypeName(
-  type: string
-): string {
-
+function objectTypeName(type: string) {
   switch (type) {
-
     case "hospital":
       return "Ziekenhuis";
-
-    case "healthcare":
-      return "Gezondheidszorg";
-
-    case "nursing_home":
-      return "Verpleeghuis";
-
-    case "care_home":
-      return "Verzorgingshuis";
-
-    case "residential_care":
-      return "Woonzorgcentrum";
-
-    case "care":
-      return "Zorginstelling";
 
     case "clinic":
       return "Kliniek";
 
-    case "doctors":
-      return "Huisarts";
-
-    case "dentist":
-      return "Tandarts";
-
-    case "pharmacy":
-      return "Apotheek";
-
-    case "physiotherapist":
-      return "Fysiotherapeut";
-
-    case "psychologist":
-      return "Psycholoog";
+    case "nursing_home":
+      return "Verpleeghuis";
 
     case "mental_health":
-      return "Geestelijke gezondheidszorg";
+      return "GGZ / psychiatrie";
 
     case "disabled_care":
       return "Gehandicaptenzorg";
@@ -265,56 +181,36 @@ function objectTypeName(
     case "home_care":
       return "Thuiszorg";
 
+    case "doctor":
+      return "Huisarts";
+
+    case "dentist":
+      return "Tandarts";
+
+    case "physiotherapy":
+      return "Fysiotherapie";
+
+    case "pharmacy":
+      return "Apotheek";
+
+    case "healthcare":
+    case "care":
+      return "Zorg";
+
     case "school":
       return "School";
 
     case "kindergarten":
       return "Kinderopvang";
 
-    case "childcare":
-      return "Kinderopvang";
-
-    case "college":
-      return "College";
-
-    case "university":
-      return "Universiteit";
-
-    case "church":
-      return "Kerk";
-
     case "place_of_worship":
       return "Gebedshuis";
-
-    case "mosque":
-      return "Moskee";
-
-    case "synagogue":
-      return "Synagoge";
-
-    case "supermarket":
-      return "Supermarkt";
-
-    case "department_store":
-      return "Warenhuis";
-
-    case "shopping_centre":
-      return "Winkelcentrum";
-
-    case "mall":
-      return "Winkelcentrum";
-
-    case "hardware_store":
-      return "Bouwmarkt";
 
     case "shop":
       return "Winkel";
 
-    case "community":
-      return "Maatschappelijke instelling";
-
     case "community_centre":
-      return "Buurt- / wijkcentrum";
+      return "Buurt-/wijkcentrum";
 
     case "social_facility":
       return "Maatschappelijke voorziening";
@@ -333,465 +229,89 @@ function objectTypeName(
   }
 }
 
-
-/* =========================================================
-   SVG ICOON VOOR OBJECT
-   Zelfde stijl als op de kaart
-   ========================================================= */
-
-function iconForType(
-  type: string
-): string {
-
+function iconForType(type: string) {
   switch (type) {
-
-    /* =====================================================
-       ZIEKENHUIS / KLINIEK
-       ===================================================== */
-
     case "hospital":
     case "clinic":
+      return (
+        <span className="object-icon object-icon-hospital">
+          ✚
+        </span>
+      );
 
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <rect
-            x="5"
-            y="4"
-            width="22"
-            height="24"
-            rx="2"
-            fill="#d32f2f"
-          />
-
-          <rect
-            x="13"
-            y="8"
-            width="6"
-            height="16"
-            fill="white"
-          />
-
-          <rect
-            x="8"
-            y="13"
-            width="16"
-            height="6"
-            fill="white"
-          />
-        </svg>
-      `;
-
-
-    /* =====================================================
-       ZORG
-       ===================================================== */
-
-    case "healthcare":
-    case "care":
     case "nursing_home":
-    case "care_home":
-    case "residential_care":
     case "mental_health":
     case "disabled_care":
     case "protected_living":
     case "hospice":
     case "rehabilitation":
     case "home_care":
-
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <circle
-            cx="16"
-            cy="16"
-            r="13"
-            fill="#1976d2"
-          />
-
-          <path
-            d="M16 8V24"
-            stroke="white"
-            stroke-width="3"
-            stroke-linecap="round"
-          />
-
-          <path
-            d="M8 16H24"
-            stroke="white"
-            stroke-width="3"
-            stroke-linecap="round"
-          />
-        </svg>
-      `;
-
-
-    /* =====================================================
-       HUISARTS / TANDARTS / APOTHEEK
-       ===================================================== */
-
-    case "doctors":
-
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <circle
-            cx="16"
-            cy="16"
-            r="13"
-            fill="#1976d2"
-          />
-
-          <path
-            d="M11 10V17C11 20 13 22 16 22C19 22 21 20 21 17V10"
-            fill="none"
-            stroke="white"
-            stroke-width="2.5"
-            stroke-linecap="round"
-          />
-
-          <path
-            d="M11 10H15"
-            stroke="white"
-            stroke-width="2.5"
-            stroke-linecap="round"
-          />
-
-          <path
-            d="M17 10H21"
-            stroke="white"
-            stroke-width="2.5"
-            stroke-linecap="round"
-          />
-        </svg>
-      `;
-
-
+    case "doctor":
     case "dentist":
-
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <circle
-            cx="16"
-            cy="16"
-            r="13"
-            fill="#1976d2"
-          />
-
-          <path
-            d="M10 10C12 8 14 10 16 10C18 10 20 8 22 10C23 12 21 15 21 18C21 21 19 24 18 24C17 24 17 20 16 20C15 20 15 24 14 24C13 24 11 21 11 18C11 15 9 12 10 10Z"
-            fill="white"
-          />
-        </svg>
-      `;
-
-
+    case "physiotherapy":
     case "pharmacy":
-
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <circle
-            cx="16"
-            cy="16"
-            r="13"
-            fill="#1976d2"
-          />
-
-          <rect
-            x="10"
-            y="13"
-            width="12"
-            height="6"
-            rx="2"
-            fill="white"
-          />
-
-          <rect
-            x="13"
-            y="10"
-            width="6"
-            height="12"
-            rx="2"
-            fill="white"
-          />
-        </svg>
-      `;
-
-
-    /* =====================================================
-       ONDERWIJS
-       ===================================================== */
+    case "healthcare":
+    case "care":
+      return (
+        <span className="object-icon object-icon-care">
+          ✚
+        </span>
+      );
 
     case "school":
     case "kindergarten":
-    case "childcare":
-    case "college":
-    case "university":
+      return (
+        <span className="object-icon object-icon-school">
+          🏫
+        </span>
+      );
 
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <path
-            d="M3 13L16 4L29 13L16 22L3 13Z"
-            fill="#f9a825"
-          />
-
-          <path
-            d="M8 16V27H24V16"
-            fill="#f9a825"
-          />
-
-          <rect
-            x="13"
-            y="20"
-            width="6"
-            height="7"
-            fill="white"
-          />
-        </svg>
-      `;
-
-
-    /* =====================================================
-       RELIGIE
-       ===================================================== */
-
-    case "church":
     case "place_of_worship":
-    case "mosque":
-    case "synagogue":
-
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <path
-            d="M6 27H26"
-            stroke="#7b1fa2"
-            stroke-width="2"
-          />
-
-          <path
-            d="M9 27V15H23V27"
-            fill="#7b1fa2"
-          />
-
-          <path
-            d="M7 15H25L16 7L7 15Z"
-            fill="#7b1fa2"
-          />
-
-          <path
-            d="M16 3V10"
-            stroke="#7b1fa2"
-            stroke-width="2"
-          />
-
-          <path
-            d="M13 6H19"
-            stroke="#7b1fa2"
-            stroke-width="2"
-          />
-        </svg>
-      `;
-
-
-    /* =====================================================
-       WINKEL
-       ===================================================== */
+      return (
+        <span className="object-icon object-icon-religion">
+          ⛪
+        </span>
+      );
 
     case "shop":
-    case "supermarket":
-    case "department_store":
-    case "shopping_centre":
-    case "mall":
-    case "hardware_store":
+      return (
+        <span className="object-icon object-icon-shop">
+          🛒
+        </span>
+      );
 
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <path
-            d="M5 12L7 5H25L27 12Z"
-            fill="#ef6c00"
-          />
-
-          <rect
-            x="6"
-            y="12"
-            width="20"
-            height="15"
-            fill="#fb8c00"
-          />
-
-          <rect
-            x="11"
-            y="18"
-            width="10"
-            height="9"
-            fill="white"
-          />
-        </svg>
-      `;
-
-
-    /* =====================================================
-       MAATSCHAPPELIJK
-       ===================================================== */
-
-    case "community":
     case "community_centre":
     case "social_facility":
-
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <path
-            d="M4 14L16 5L28 14V27H4V14Z"
-            fill="#388e3c"
-          />
-
-          <rect
-            x="9"
-            y="17"
-            width="5"
-            height="6"
-            fill="white"
-          />
-
-          <rect
-            x="18"
-            y="17"
-            width="5"
-            height="6"
-            fill="white"
-          />
-        </svg>
-      `;
-
-
-    /* =====================================================
-       VERBLIJF
-       ===================================================== */
+      return (
+        <span className="object-icon object-icon-community">
+          🏢
+        </span>
+      );
 
     case "hotel":
     case "hostel":
     case "guest_house":
-
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <rect
-            x="5"
-            y="12"
-            width="22"
-            height="14"
-            rx="2"
-            fill="#8e24aa"
-          />
-
-          <rect
-            x="8"
-            y="15"
-            width="7"
-            height="5"
-            fill="white"
-          />
-
-          <rect
-            x="17"
-            y="15"
-            width="7"
-            height="5"
-            fill="white"
-          />
-
-          <rect
-            x="13"
-            y="21"
-            width="6"
-            height="5"
-            fill="white"
-          />
-        </svg>
-      `;
-
-
-    /* =====================================================
-       OVERIG
-       ===================================================== */
+      return (
+        <span className="object-icon object-icon-hotel">
+          🏨
+        </span>
+      );
 
     default:
-
-      return `
-        <svg
-          viewBox="0 0 32 32"
-          width="28"
-          height="28"
-        >
-          <circle
-            cx="16"
-            cy="16"
-            r="11"
-            fill="#607d8b"
-          />
-
-          <circle
-            cx="16"
-            cy="16"
-            r="4"
-            fill="white"
-          />
-        </svg>
-      `;
+      return (
+        <span className="object-icon object-icon-other">
+          ●
+        </span>
+      );
   }
 }
 
-
-/* =========================================================
-   CATEGORIE ICOON
-   Gebruikt voor de objectcategorieën in de lijst.
-   Niet gebruikt voor de filterknoppen.
-   ========================================================= */
-
 function categoryIcon(
   category: Category
-): string {
-
+) {
   switch (category) {
-
     case "Zorg":
-      return "🏥";
+      return "✚";
 
     case "Onderwijs":
       return "🏫";
@@ -809,14 +329,9 @@ function categoryIcon(
       return "🏨";
 
     case "Overig":
-      return "📍";
+      return "●";
   }
 }
-
-
-/* =========================================================
-   CATEGORIE VOLGORDE
-   ========================================================= */
 
 const categoryOrder: Category[] = [
   "Zorg",
@@ -828,75 +343,49 @@ const categoryOrder: Category[] = [
   "Overig",
 ];
 
+function copyToClipboard(text: string) {
+  const textarea =
+    document.createElement("textarea");
 
-/* =========================================================
-   APP
-   ========================================================= */
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+
+  document.body.appendChild(textarea);
+
+  textarea.focus();
+  textarea.select();
+
+  try {
+    document.execCommand("copy");
+  } finally {
+    document.body.removeChild(
+      textarea
+    );
+  }
+}
 
 function App() {
+  const [location, setLocation] =
+    useState<LocationData | null>(null);
 
-  /* =======================================================
-     LOCATIE
-     ======================================================= */
+  const [weather, setWeather] =
+    useState<WeatherResult | null>(null);
 
-  const [
-    location,
-    setLocation
-  ] = useState({
-    latitude: 53.11148951,
-    longitude: 6.13380985,
-    address: "Noorderend 4, Drachten",
-  });
+  const [objects, setObjects] =
+    useState<VulnerableObject[]>([]);
 
+  const [objectsLoading, setObjectsLoading] =
+    useState(false);
 
-  /* =======================================================
-     WEER
-     ======================================================= */
-
-  const [
-    weather,
-    setWeather
-  ] = useState<WeatherResult | null>(null);
-
-
-  /* =======================================================
-     OBJECTEN
-     ======================================================= */
-
-  const [
-    objects,
-    setObjects
-  ] = useState<VulnerableObject[]>([]);
-
-
-  const [
-    objectsLoading,
-    setObjectsLoading
-  ] = useState(false);
-
-
-  /* =======================================================
-     GASZONE
-     ======================================================= */
-
-  const [
-    gasZone,
-    setGasZone
-  ] = useState<[number, number][]>([]);
-
-
-  /* =======================================================
-     INGEKLAPTE CATEGORIEËN
-
-     true = ingeklapt
-     false = open
-
-     Standaard staan alle categorieën ingeklapt.
-     ======================================================= */
+  const [gasZone, setGasZone] =
+    useState<[number, number][] | null>(
+      null
+    );
 
   const [
     collapsedCategories,
-    setCollapsedCategories
+    setCollapsedCategories,
   ] = useState<Record<Category, boolean>>({
     Zorg: true,
     Onderwijs: true,
@@ -906,20 +395,10 @@ function App() {
     Verblijf: true,
     Overig: true,
   });
-
-
-  /* =======================================================
-     FILTER CATEGORIEËN
-
-     true = zichtbaar
-     false = verborgen
-
-     Standaard staan alle categorieën aan.
-     ======================================================= */
 
   const [
     enabledCategories,
-    setEnabledCategories
+    setEnabledCategories,
   ] = useState<Record<Category, boolean>>({
     Zorg: true,
     Onderwijs: true,
@@ -930,67 +409,45 @@ function App() {
     Overig: true,
   });
 
+  const [copiedSection, setCopiedSection] =
+    useState<
+      "weather" | "objects" | null
+    >(null);
 
-  /* =======================================================
-     CATEGORIE OPEN / DICHT
-     ======================================================= */
+  const requestIdRef = useRef(0);
 
   function toggleCategory(
     category: Category
   ) {
-
     setCollapsedCategories(
       (previous) => ({
         ...previous,
-        [category]: !previous[category],
+        [category]:
+          !previous[category],
       })
     );
   }
-
-
-  /* =======================================================
-     CATEGORIE ZICHTBAAR / ONZICHTBAAR
-     ======================================================= */
 
   function toggleCategoryVisibility(
     category: Category
   ) {
-
     setEnabledCategories(
       (previous) => ({
         ...previous,
-        [category]: !previous[category],
+        [category]:
+          !previous[category],
       })
     );
   }
 
-
-  /* =======================================================
-     AANVRAAG-ID
-     ======================================================= */
-
-  const requestIdRef =
-    useRef(0);
-
-
-  /* =======================================================
-     OBJECTEN OPHALEN
-     ======================================================= */
-
   async function loadObjects(
     latitude: number,
     longitude: number,
-    requestId: number
+    currentRequestId: number
   ) {
-
-    console.log(
-      "🔎 Objecten ophalen binnen:",
-      OBJECT_SEARCH_RADIUS,
-      "meter"
-    );
+    setObjectsLoading(true);
 
     try {
-
       const result =
         await getVulnerableObjects(
           latitude,
@@ -998,763 +455,638 @@ function App() {
           OBJECT_SEARCH_RADIUS
         );
 
-
       if (
-        requestId !== requestIdRef.current
+        requestIdRef.current !==
+        currentRequestId
       ) {
-
-        console.log(
-          "⚠️ Oude objectaanvraag genegeerd."
-        );
-
         return;
       }
 
-
-      console.log(
-        "✅ Objecten ontvangen:",
-        result.length
-      );
-
-      setObjects(result);
-
+      setObjects(result || []);
     } catch (error) {
-
-      if (
-        requestId !== requestIdRef.current
-      ) {
-        return;
-      }
-
       console.error(
-        "❌ Fout bij objecten:",
+        "Fout bij ophalen kwetsbare objecten:",
         error
       );
 
-      setObjects([]);
-
-    } finally {
-
       if (
-        requestId === requestIdRef.current
+        requestIdRef.current ===
+        currentRequestId
       ) {
-
+        setObjects([]);
+      }
+    } finally {
+      if (
+        requestIdRef.current ===
+        currentRequestId
+      ) {
         setObjectsLoading(false);
-
       }
     }
   }
-
-
-  /* =======================================================
-     LOCATIE GEVONDEN
-     ======================================================= */
 
   async function handleLocationFound(
-    locationData: {
-      address: string;
-      latitude: number;
-      longitude: number;
-    }
+    data: LocationData
   ) {
+    const currentRequestId =
+      ++requestIdRef.current;
 
-    requestIdRef.current += 1;
-
-    const requestId =
-      requestIdRef.current;
-
-
-    console.log(
-      "📍 Nieuwe locatie:",
-      locationData,
-      "request:",
-      requestId
-    );
-
-
-    setLocation(locationData);
-
-
-    /* -----------------------------------------------------
-       OUDE DATA WISSEN
-       ----------------------------------------------------- */
-
+    setLocation(data);
     setWeather(null);
-
     setObjects([]);
-
-    setGasZone([]);
-
-    setObjectsLoading(true);
-
-
-    /* -----------------------------------------------------
-       WEER
-       ----------------------------------------------------- */
+    setGasZone(null);
 
     try {
-
       const weatherData =
         await getWeather(
-          locationData.latitude,
-          locationData.longitude
+          data.latitude,
+          data.longitude
         );
 
-
       if (
-        requestId !== requestIdRef.current
+        requestIdRef.current ===
+        currentRequestId
       ) {
-
-        return;
+        setWeather(weatherData);
       }
-
-
-      setWeather(weatherData);
-
     } catch (error) {
-
-      if (
-        requestId !== requestIdRef.current
-      ) {
-
-        return;
-      }
-
       console.error(
-        "❌ Fout bij weer:",
+        "Fout bij ophalen weer:",
         error
       );
-
-      setWeather(null);
     }
 
-
-    /* -----------------------------------------------------
-       OBJECTEN
-       ----------------------------------------------------- */
-
     await loadObjects(
-      locationData.latitude,
-      locationData.longitude,
-      requestId
+      data.latitude,
+      data.longitude,
+      currentRequestId
     );
   }
 
+  const filteredObjects =
+    objects.filter((object) => {
+      if (
+        !location ||
+        typeof object.latitude !==
+          "number" ||
+        typeof object.longitude !==
+          "number"
+      ) {
+        return false;
+      }
 
-  /* =========================================================
-     OBJECTEN FILTEREN OP 500 METER + GASZONE
+      if (
+        !object.name ||
+        object.name.trim() === ""
+      ) {
+        return false;
+      }
 
-     Dit is de bestaande ruimtelijke filtering.
-     ========================================================= */
+      if (
+        object.type ===
+          "shopping_centre" &&
+        !object.name
+      ) {
+        return false;
+      }
 
-  const spatiallyVisibleObjects =
-    objects.filter(
-      (object) => {
-
-        const name =
-          object.name
-            .trim()
-            .toLowerCase();
-
-
-        /* ---------------------------------------------------
-           NAAMLOZE WINKELCENTRA UITSLUITEN
-           --------------------------------------------------- */
-
-        if (
-          (
-            name === "onbekend object" ||
-            name === "" ||
-            name === "unknown"
-          ) &&
-          (
-            object.type === "shopping_centre" ||
-            object.type === "mall"
-          )
-        ) {
-
-          return false;
-        }
-
-
-        /* ---------------------------------------------------
-           AFSTAND
-           --------------------------------------------------- */
-
-        const distance =
-          distanceInMeters(
-            location.latitude,
-            location.longitude,
-            object.latitude,
-            object.longitude
-          );
-
-
-        /* ---------------------------------------------------
-           500 METER
-           --------------------------------------------------- */
-
-        if (
-          distance <= OBJECT_CIRCLE_RADIUS
-        ) {
-
-          return true;
-        }
-
-
-        /* ---------------------------------------------------
-           GASZONE NOG NIET BESCHIKBAAR
-           --------------------------------------------------- */
-
-        if (
-          gasZone.length < 3
-        ) {
-
-          return false;
-        }
-
-
-        /* ---------------------------------------------------
-           GASZONE
-           --------------------------------------------------- */
-
-        return pointInPolygon(
+      const distance =
+        distanceInMeters(
+          location.latitude,
+          location.longitude,
           object.latitude,
-          object.longitude,
+          object.longitude
+        );
+
+      const insideCircle =
+        distance <=
+        OBJECT_CIRCLE_RADIUS;
+
+      const insideGasZone =
+        gasZone &&
+        pointInPolygon(
+          [
+            object.latitude,
+            object.longitude,
+          ],
           gasZone
         );
-      }
-    );
 
-
-  /* =========================================================
-     CATEGORIE FILTER
-
-     Eerst wordt de bestaande 500m/gaszone-filter toegepast.
-     Daarna wordt alleen gekeken welke categorieën zichtbaar
-     zijn.
-     ========================================================= */
+      return (
+        insideCircle ||
+        insideGasZone
+      );
+    });
 
   const visibleObjects =
-    spatiallyVisibleObjects.filter(
+    filteredObjects.filter(
       (object) => {
-
         const category =
           categoryForType(
             object.type
           );
 
-        return enabledCategories[category];
+        return enabledCategories[
+          category
+        ];
       }
     );
 
+  const groupedObjects: Record<
+    Category,
+    VulnerableObject[]
+  > = {
+    Zorg: [],
+    Onderwijs: [],
+    Religie: [],
+    Winkels: [],
+    Maatschappelijk: [],
+    Verblijf: [],
+    Overig: [],
+  };
 
-  /* =========================================================
-     OBJECTEN GROEPEREN
-     ========================================================= */
+  visibleObjects.forEach(
+    (object) => {
+      const category =
+        categoryForType(
+          object.type
+        );
 
-  const groupedObjects =
-    visibleObjects.reduce(
-      (
-        groups,
-        object
-      ) => {
-
-        const category =
-          categoryForType(
-            object.type
-          );
-
-        if (!groups[category]) {
-          groups[category] = [];
-        }
-
-        groups[category].push(object);
-
-        return groups;
-
-      },
-      {} as Record<
-        Category,
-        VulnerableObject[]
-      >
-    );
-
-
-  /* =========================================================
-     TOTAAL
-     ========================================================= */
+      groupedObjects[
+        category
+      ].push(object);
+    }
+  );
 
   const totalVisibleObjects =
     visibleObjects.length;
 
+  function copyWeather() {
+    if (!weather) {
+      return;
+    }
 
-  /* =========================================================
-     RENDER
-     ========================================================= */
+    const windSpeedMs =
+      weather.windSpeed / 3.6;
+
+    const text = `METEOSITUATIE
+
+Windkracht: ${getBeaufort(
+      weather.windSpeed
+    )} Beaufort
+Windsnelheid: ${weather.windSpeed.toFixed(
+      1
+    )} km/u (${windSpeedMs.toFixed(
+      1
+    )} m/s)
+Windrichting: ${
+      weather.windDirectionText
+    } (${Math.round(
+      weather.windDirection
+    )}°)
+Temperatuur: ${
+      weather.temperature
+    } °C
+Meting: ${
+      weather.measurementTime
+    }
+Bron: Open-Meteo`;
+
+    copyToClipboard(text);
+
+    setCopiedSection("weather");
+
+    setTimeout(() => {
+      setCopiedSection(
+        (current) =>
+          current === "weather"
+            ? null
+            : current
+      );
+    }, 1500);
+  }
+
+  function copyObjects() {
+    if (!location) {
+      return;
+    }
+
+    let text = `KWETSBARE OBJECTEN
+
+Incidentlocatie: ${location.address}
+
+`;
+
+    categoryOrder.forEach(
+      (category) => {
+        const categoryObjects =
+          groupedObjects[
+            category
+          ];
+
+        if (
+          categoryObjects.length ===
+          0
+        ) {
+          return;
+        }
+
+        text += `${category} (${categoryObjects.length})\n`;
+
+        categoryObjects.forEach(
+          (object) => {
+            const distance =
+              distanceInMeters(
+                location.latitude,
+                location.longitude,
+                object.latitude,
+                object.longitude
+              );
+
+            text += `- ${
+              object.name
+            } — ${objectTypeName(
+              object.type
+            )} — ${distance} m\n`;
+          }
+        );
+
+        text += "\n";
+      }
+    );
+
+    copyToClipboard(
+      text.trim()
+    );
+
+    setCopiedSection("objects");
+
+    setTimeout(() => {
+      setCopiedSection(
+        (current) =>
+          current === "objects"
+            ? null
+            : current
+      );
+    }, 1500);
+  }
 
   return (
     <div className="app">
+      <header className="app-header">
+        <div>
+          <h1>
+            Omgevingsscan
+          </h1>
 
-      {/* ===================================================
-          HEADER
-          =================================================== */}
-
-      <header className="header">
-
-        <div className="header-inner">
-
-          <div className="header-title">
-
-            <h1>
-              Omgevingsscan
-            </h1>
-
-            <p>
-              Incidentondersteuning • Omgevingsanalyse • Veiligheidsbeeld
-            </p>
-
-          </div>
-
-
-          <div className="header-status">
-
-            <span className="header-status-indicator" />
-
-            <div className="header-status-text">
-
-              <span className="header-status-label">
-                SYSTEEMSTATUS
-              </span>
-
-              <span className="header-status-value">
-                Operationeel
-              </span>
-
-            </div>
-
-          </div>
-
+          <p>
+            Operationeel overzicht
+            van de omgeving rond
+            een incident
+          </p>
         </div>
-
-
-        <div className="header-accent" />
-
       </header>
 
-
-      {/* ===================================================
-          ZOEKPANEEL
-          =================================================== */}
-
-      <section className="search-panel">
-
-        <h2>
-          Incidentlocatie
-        </h2>
-
-        <SearchBar
-          onLocationFound={
-            handleLocationFound
-          }
-        />
-
-
-        {/* =================================================
-            CATEGORIEFILTER
-            ================================================= */}
-
-        <div
-          className="category-filter-bar"
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "6px",
-            marginTop: "14px",
-            alignItems: "center",
-          }}
-        >
-
-          {categoryOrder.map(
-            (category) => {
-
-              const enabled =
-                enabledCategories[category];
-
-              return (
-
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() =>
-                    toggleCategoryVisibility(
-                      category
-                    )
-                  }
-                  aria-pressed={enabled}
-                  title={
-                    enabled
-                      ? `${category} verbergen`
-                      : `${category} tonen`
-                  }
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "7px",
-                    padding: "6px 11px",
-                    borderRadius: "5px",
-                    border: enabled
-                      ? "1px solid #555"
-                      : "1px solid #aaa",
-                    background: enabled
-                      ? "#4a4a4a"
-                      : "#e4e4e4",
-                    color: enabled
-                      ? "#ffffff"
-                      : "#555555",
-                    cursor: "pointer",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    lineHeight: 1.2,
-                    boxShadow: enabled
-                      ? "inset 0 1px 0 rgba(255,255,255,0.08)"
-                      : "none",
-                    transition:
-                      "background 0.15s ease, border 0.15s ease, color 0.15s ease",
-                  }}
-                >
-
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: "15px",
-                      height: "15px",
-                      fontSize: "14px",
-                      fontWeight: 700,
-                      lineHeight: 1,
-                    }}
-                  >
-                    {enabled ? "☑" : "☐"}
-                  </span>
-
-                  <span>
-                    {category}
-                  </span>
-
-                </button>
-
-              );
-            }
-          )}
-
-        </div>
-
-      </section>
-
-
-      {/* ===================================================
-          DASHBOARD
-          =================================================== */}
-
-      <main className="dashboard">
-
-
-        {/* =================================================
-            WEER
-            ================================================= */}
-
-        <section className="panel weather-panel">
-
+      <main className="app-content">
+        <section className="panel location-panel">
           <h2>
-            Weersituatie
+            Incidentlocatie
           </h2>
+
+          <div className="location-search">
+            <SearchBar
+              onLocationFound={
+                handleLocationFound
+              }
+            />
+          </div>
+
+          {location && (
+            <div className="location-info">
+              <strong>
+                {
+                  location.address
+                }
+              </strong>
+
+              <div>
+                {location.latitude.toFixed(
+                  5
+                )}
+                ,{" "}
+                {location.longitude.toFixed(
+                  5
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="panel">
+          <div className="panel-title-actions">
+            <h2>
+              Meteo
+            </h2>
+
+            <button
+              type="button"
+              className="copy-button"
+              onClick={
+                copyWeather
+              }
+              disabled={!weather}
+            >
+              {copiedSection ===
+              "weather"
+                ? "✓ Gekopieerd"
+                : "📋 Kopiëren"}
+            </button>
+          </div>
 
           <WeatherPanel
             weather={weather}
           />
-
         </section>
 
-
-        {/* =================================================
-            OBJECTEN
-            ================================================= */}
-
-        <section className="panel objects-panel">
-
-          <div className="panel-title-row">
-
+        <section className="panel">
+          <div className="panel-title-actions">
             <h2>
               Kwetsbare objecten
+              {totalVisibleObjects >
+                0 &&
+                ` (${totalVisibleObjects})`}
             </h2>
 
-            <span className="object-total">
-
-              {objectsLoading
-                ? "..."
-                : totalVisibleObjects
+            <button
+              type="button"
+              className="copy-button"
+              onClick={
+                copyObjects
               }
-
-            </span>
-
+              disabled={
+                !location ||
+                visibleObjects.length ===
+                  0
+              }
+            >
+              {copiedSection ===
+              "objects"
+                ? "✓ Gekopieerd"
+                : "📋 Kopiëren"}
+            </button>
           </div>
 
+          {!objectsLoading &&
+            filteredObjects.length >
+              0 && (
+              <div className="category-filters">
+                {categoryOrder.map(
+                  (category) => {
+                    const enabled =
+                      enabledCategories[
+                        category
+                      ];
 
-          {objectsLoading ? (
-
-            <div className="objects-loading">
-
-              <div className="loading-icon">
-                ⟳
-              </div>
-
-              <div>
-                Objecten worden opgehaald...
-              </div>
-
-            </div>
-
-          ) : totalVisibleObjects === 0 ? (
-
-            <div className="objects-empty">
-
-              <div className="empty-icon">
-                ✓
-              </div>
-
-              <div>
-                Geen kwetsbare objecten gevonden.
-              </div>
-
-            </div>
-
-          ) : (
-
-            <div className="objects-list">
-
-              {categoryOrder.map(
-                (category) => {
-
-                  const categoryObjects =
-                    groupedObjects[category];
-
-                  if (
-                    !categoryObjects ||
-                    categoryObjects.length === 0
-                  ) {
-
-                    return null;
-                  }
-
-
-                  /* -----------------------------------------
-                     SORTEREN OP AFSTAND
-                     ----------------------------------------- */
-
-                  const sortedObjects =
-                    [...categoryObjects].sort(
-                      (a, b) => {
-
-                        const distanceA =
-                          distanceInMeters(
-                            location.latitude,
-                            location.longitude,
-                            a.latitude,
-                            a.longitude
-                          );
-
-                        const distanceB =
-                          distanceInMeters(
-                            location.latitude,
-                            location.longitude,
-                            b.latitude,
-                            b.longitude
-                          );
-
-                        return distanceA - distanceB;
-                      }
-                    );
-
-
-                  const isCollapsed =
-                    collapsedCategories[category];
-
-
-                  return (
-
-                    <div
-                      className={`object-category ${
-                        isCollapsed
-                          ? "object-category-collapsed"
-                          : "object-category-open"
-                      }`}
-                      key={category}
-                    >
-
-                      {/* =================================
-                          CATEGORIEBALK
-                          ================================= */}
-
+                    return (
                       <button
+                        key={category}
                         type="button"
-                        className="object-category-title"
+                        className={`category-filter-button ${
+                          enabled
+                            ? "category-filter-active"
+                            : "category-filter-inactive"
+                        }`}
                         onClick={() =>
-                          toggleCategory(category)
+                          toggleCategoryVisibility(
+                            category
+                          )
                         }
-                        aria-expanded={!isCollapsed}
+                        aria-pressed={
+                          enabled
+                        }
+                        title={
+                          enabled
+                            ? `${category} verbergen`
+                            : `${category} tonen`
+                        }
                       >
-
-                        <span className="object-category-icon">
-                          {categoryIcon(category)}
+                        <span
+                          className="category-filter-checkbox"
+                          style={{
+                            color:
+                              enabled
+                                ? "#2e7d32"
+                                : "#000000",
+                          }}
+                        >
+                          {enabled
+                            ? "☑"
+                            : "☐"}
                         </span>
 
-                        <span className="object-category-name">
+                        <span className="category-filter-name">
                           {category}
                         </span>
-
-                        <span className="object-category-count">
-                          {sortedObjects.length}
-                        </span>
-
-                        <span
-                          className={`category-chevron ${
-                            isCollapsed
-                              ? "collapsed"
-                              : "expanded"
-                          }`}
-                        >
-                          ›
-                        </span>
-
                       </button>
+                    );
+                  }
+                )}
+              </div>
+            )}
 
+          {objectsLoading && (
+            <div className="loading">
+              Kwetsbare objecten
+              laden...
+            </div>
+          )}
 
-                      {/* =================================
-                          OBJECTEN
-                          ================================= */}
+          {!objectsLoading &&
+            filteredObjects.length ===
+              0 && (
+              <div className="empty-state">
+                Geen kwetsbare
+                objecten gevonden
+                binnen het
+                geselecteerde
+                gebied.
+              </div>
+            )}
 
-                      {!isCollapsed && (
+          {!objectsLoading &&
+            filteredObjects.length >
+              0 &&
+            visibleObjects.length ===
+              0 && (
+              <div className="empty-state">
+                Geen zichtbare
+                categorieën
+                geselecteerd.
+              </div>
+            )}
 
-                        <div className="object-category-list">
+          {!objectsLoading &&
+            filteredObjects.length >
+              0 && (
+              <div className="object-categories">
+                {categoryOrder.map(
+                  (category) => {
+                    const categoryObjects =
+                      groupedObjects[
+                        category
+                      ];
 
-                          {sortedObjects.map(
-                            (object) => {
+                    if (
+                      categoryObjects.length ===
+                      0
+                    ) {
+                      return null;
+                    }
 
-                              const distance =
-                                distanceInMeters(
-                                  location.latitude,
-                                  location.longitude,
-                                  object.latitude,
-                                  object.longitude
-                                );
+                    return (
+                      <div
+                        key={category}
+                        className="object-category"
+                      >
+                        <button
+                          type="button"
+                          className="category-header"
+                          onClick={() =>
+                            toggleCategory(
+                              category
+                            )
+                          }
+                        >
+                          <span className="category-title">
+                            <span className="category-icon">
+                              {categoryIcon(
+                                category
+                              )}
+                            </span>
 
+                            <span>
+                              {
+                                category
+                              }{" "}
+                              (
+                              {
+                                categoryObjects.length
+                              }
+                              )
+                            </span>
+                          </span>
 
-                              return (
+                          <span>
+                            {
+                              collapsedCategories[
+                                category
+                              ]
+                                ? "▶"
+                                : "▼"
+                            }
+                          </span>
+                        </button>
 
-                                <div
-                                  className="object-row"
-                                  key={object.id}
-                                >
+                        {!collapsedCategories[
+                          category
+                        ] && (
+                          <div className="object-list">
+                            {categoryObjects.map(
+                              (
+                                object
+                              ) => {
+                                const distance =
+                                  location
+                                    ? distanceInMeters(
+                                        location.latitude,
+                                        location.longitude,
+                                        object.latitude,
+                                        object.longitude
+                                      )
+                                    : null;
 
+                                return (
                                   <div
-                                    className="object-icon"
-                                    dangerouslySetInnerHTML={{
-                                      __html:
-                                        iconForType(
-                                          object.type
-                                        )
-                                    }}
-                                  />
-
-
-                                  <div className="object-details">
-
-                                    <div className="object-name">
-                                      {object.name}
-                                    </div>
-
-                                    <div className="object-type">
-                                      {objectTypeName(
+                                    key={
+                                      object.id
+                                    }
+                                    className="object-item"
+                                  >
+                                    <div className="object-item-icon">
+                                      {iconForType(
                                         object.type
                                       )}
                                     </div>
 
+                                    <div className="object-item-content">
+                                      <div className="object-item-name">
+                                        {
+                                          object.name
+                                        }
+                                      </div>
+
+                                      <div className="object-item-type">
+                                        {objectTypeName(
+                                          object.type
+                                        )}
+                                      </div>
+
+                                      {distance !==
+                                        null && (
+                                        <div className="object-item-distance">
+                                          {
+                                            distance
+                                          }{" "}
+                                          m
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-
-
-                                  <div className="object-distance">
-
-                                    {distance < 1000
-                                      ? `${Math.round(distance)} m`
-                                      : `${(
-                                          distance / 1000
-                                        ).toFixed(1)
-                                        } km`
-                                    }
-
-                                  </div>
-
-                                </div>
-
-                              );
-                            }
-                          )}
-
-                        </div>
-
-                      )}
-
-                    </div>
-
-                  );
-                }
-              )}
-
-            </div>
-
-          )}
-
+                                );
+                              }
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                )}
+              </div>
+            )}
         </section>
 
-
-        {/* =================================================
-            KAART
-            ================================================= */}
-
         <section className="panel map-panel">
-
-          <h2>
-            Omgevingskaart
-          </h2>
-
           <MapView
-            latitude={location.latitude}
-            longitude={location.longitude}
+            latitude={
+              location?.latitude ??
+              53.1406
+            }
+            longitude={
+              location?.longitude ??
+              7.035
+            }
             windDirection={
-              weather?.windDirection ?? 0
+              weather?.windDirection ??
+              0
             }
             windSpeed={
-              weather?.windSpeed ?? 0
+              weather?.windSpeed ??
+              0
             }
             weatherLoaded={
               weather !== null
             }
-            objects={visibleObjects}
+            objects={
+              visibleObjects
+            }
             onGasZoneCreated={
               setGasZone
             }
           />
-
         </section>
-
       </main>
-
     </div>
   );
 }
-
 
 export default App;
