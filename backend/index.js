@@ -13,8 +13,21 @@ const OVERPASS_SERVERS = [
   "https://overpass.kumi.systems/api/interpreter",
 ];
 
+const OVERPASS_TIMEOUTS = [
+  5000,
+  10000,
+  10000,
+];
+
 // ============================================================
-// HULPFUNCTIES
+// GLOBAL CACHES
+// ============================================================
+
+const bagPandCache = new Map();
+const bagPandPromiseCache = new Map();
+
+// ============================================================
+// HELPERS
 // ============================================================
 
 function normalizeText(value) {
@@ -32,13 +45,15 @@ function normalizeStreet(value) {
     .replace(/\bweg\b/g, "")
     .replace(/\blaan\b/g, "")
     .replace(/\bplein\b/g, "")
+    .replace(/\bdijk\b/g, "")
+    .replace(/\bkade\b/g, "")
     .replace(/\bpad\b/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function normalizeHouseNumber(value) {
-  if (value === undefined || value === null) {
+  if (value === null || value === undefined) {
     return "";
   }
 
@@ -51,78 +66,55 @@ function normalizeHouseNumber(value) {
 function distanceMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
 
-  const dLat =
-    (lat2 - lat1) *
-    Math.PI /
-    180;
+  const p1 = (lat1 * Math.PI) / 180;
+  const p2 = (lat2 * Math.PI) / 180;
 
-  const dLon =
-    (lon2 - lon1) *
-    Math.PI /
-    180;
+  const dp = ((lat2 - lat1) * Math.PI) / 180;
+  const dl = ((lon2 - lon1) * Math.PI) / 180;
 
   const a =
-    Math.sin(dLat / 2) *
-      Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) *
-      Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.sin(dp / 2) * Math.sin(dp / 2) +
+    Math.cos(p1) *
+      Math.cos(p2) *
+      Math.sin(dl / 2) *
+      Math.sin(dl / 2);
 
-  const c =
-    2 *
-    Math.atan2(
-      Math.sqrt(a),
-      Math.sqrt(1 - a)
-    );
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c;
 }
 
 function getElementCoordinates(element) {
+  if (!element) {
+    return null;
+  }
+
   if (
-    element.lat !== undefined &&
-    element.lon !== undefined
+    typeof element.lat === "number" &&
+    typeof element.lon === "number"
   ) {
     return {
-      latitude: Number(element.lat),
-      longitude: Number(element.lon),
+      latitude: element.lat,
+      longitude: element.lon,
     };
   }
 
   if (
     element.center &&
-    element.center.lat !== undefined &&
-    element.center.lon !== undefined
+    typeof element.center.lat === "number" &&
+    typeof element.center.lon === "number"
   ) {
     return {
-      latitude: Number(element.center.lat),
-      longitude: Number(element.center.lon),
+      latitude: element.center.lat,
+      longitude: element.center.lon,
     };
-  }
-
-  if (
-    element.geometry &&
-    element.geometry.length
-  ) {
-    const first = element.geometry[0];
-
-    if (
-      first.lat !== undefined &&
-      first.lon !== undefined
-    ) {
-      return {
-        latitude: Number(first.lat),
-        longitude: Number(first.lon),
-      };
-    }
   }
 
   return null;
 }
 
 // ============================================================
-// ZORGTYPE DETECTIE
+// CARE TYPE DETECTION
 // ============================================================
 
 function detectCareTypeFromText(text) {
@@ -142,9 +134,8 @@ function detectCareTypeFromText(text) {
   if (
     value.includes("gehandicaptenzorg") ||
     value.includes("gehandicapten") ||
-    value.includes("dignis") ||
-    value.includes("doven") ||
-    value.includes("visueel gehandicapten")
+    value.includes("woonbegeleiding") ||
+    value.includes("zorg voor gehandicapten")
   ) {
     return "disability_care";
   }
@@ -209,137 +200,140 @@ function detectCareTypeFromText(text) {
   }
 
   if (
-    value.includes("kinderopvang") ||
     value.includes("kinderdagverblijf") ||
+    value.includes("kinderopvang") ||
     value.includes("peuterspeelzaal")
   ) {
     return "daycare";
+  }
+
+  if (
+    value.includes("ziekenhuis") ||
+    value.includes("hospital")
+  ) {
+    return "hospital";
+  }
+
+  if (
+    value.includes("kliniek") ||
+    value.includes("clinic")
+  ) {
+    return "clinic";
   }
 
   return null;
 }
 
 // ============================================================
-// OBJECTCLASSIFICATIE
+// OBJECT TYPE
 // ============================================================
 
 function getObjectType(tags = {}) {
-  const amenity =
-    normalizeText(tags.amenity);
+  const name = tags.name || "";
+  const amenity = normalizeText(tags.amenity);
+  const healthcare = normalizeText(tags.healthcare);
+  const socialFacility = normalizeText(tags.social_facility);
+  const shop = normalizeText(tags.shop);
+  const tourism = normalizeText(tags.tourism);
+  const leisure = normalizeText(tags.leisure);
 
-  const healthcare =
-    normalizeText(tags.healthcare);
+  const text = [
+    name,
+    tags.description,
+    tags.operator,
+    tags["official_name"],
+    tags["alt_name"],
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  const socialFacility =
-    normalizeText(tags.social_facility);
+  const detectedCareType = detectCareTypeFromText(text);
 
-  const tourism =
-    normalizeText(tags.tourism);
-
-  const shop =
-    normalizeText(tags.shop);
-
-  const leisure =
-    normalizeText(tags.leisure);
-
-  const sport =
-    normalizeText(tags.sport);
-
-  const name =
-    normalizeText(
-      [
-        tags.name,
-        tags.operator,
-        tags.official_name,
-        tags.description,
-      ]
-        .filter(Boolean)
-        .join(" ")
-    );
-
-  if (name.includes("jonx")) {
-    return "mental_health";
+  if (detectedCareType) {
+    return detectedCareType;
   }
 
-  if (name.includes("dignis")) {
-    return "nursing_home";
-  }
+  const normalizedName = normalizeText(name);
 
-  const careFromText =
-    detectCareTypeFromText(name);
-
-  if (careFromText) {
-    return careFromText;
+  if (
+    normalizedName.includes("jonx") ||
+    normalizedName.includes("dignis")
+  ) {
+    return "disability_care";
   }
 
   if (
-    healthcare === "hospital" ||
+    socialFacility.includes("nursing_home") ||
+    socialFacility.includes("care") ||
+    socialFacility.includes("assisted_living")
+  ) {
+    return "other_care";
+  }
+
+  if (
+    healthcare.includes("hospital") ||
     amenity === "hospital"
   ) {
     return "hospital";
   }
 
   if (
-    healthcare === "clinic" ||
+    healthcare.includes("clinic") ||
     amenity === "clinic"
   ) {
     return "clinic";
   }
 
   if (
-    healthcare === "doctor" ||
+    healthcare.includes("doctor") ||
+    healthcare.includes("general_practitioner") ||
     amenity === "doctors"
   ) {
     return "doctor";
   }
 
   if (
-    healthcare === "dentist" ||
+    healthcare.includes("dentist") ||
     amenity === "dentist"
   ) {
     return "dentist";
   }
 
-  if (healthcare === "physiotherapist") {
+  if (
+    healthcare.includes("physiotherapist") ||
+    healthcare.includes("physiotherapy")
+  ) {
     return "physiotherapy";
   }
 
   if (
-    healthcare === "pharmacy" ||
+    healthcare.includes("pharmacy") ||
     amenity === "pharmacy"
   ) {
     return "pharmacy";
   }
 
-  if (socialFacility) {
-    return "other_care";
+  if (amenity === "school") {
+    return "school";
   }
 
-  if (
-    amenity === "school" ||
-    amenity === "kindergarten" ||
-    amenity === "college" ||
-    amenity === "university"
-  ) {
-    return "school";
+  if (amenity === "kindergarten") {
+    return "daycare";
   }
 
   if (amenity === "place_of_worship") {
     return "place_of_worship";
   }
 
-  if (
-    amenity === "community_centre" ||
-    amenity === "social_centre"
-  ) {
+  if (amenity === "community_centre") {
     return "community_centre";
   }
 
-  if (
-    leisure === "sports_centre" ||
-    leisure === "stadium" ||
-    sport
-  ) {
+  if (leisure === "sports_centre") {
+    return "sports";
+  }
+
+  if (leisure === "stadium") {
     return "sports";
   }
 
@@ -359,46 +353,57 @@ function getObjectType(tags = {}) {
     return "marketplace";
   }
 
+  if (socialFacility) {
+    return "other_care";
+  }
+
   return "other";
 }
 
 // ============================================================
-// PRIORITEIT
+// PRIORITY
 // ============================================================
 
 function priorityForType(type) {
-  const priorities = {
-    nursing_home: 1,
-    disability_care: 1,
-    hospice: 1,
-    mental_health: 1,
-    rehabilitation: 1,
-    hospital: 1,
-    clinic: 1,
+  switch (type) {
+    case "hospital":
+      return 1;
 
-    school: 2,
-    daycare: 2,
+    case "nursing_home":
+    case "disability_care":
+    case "hospice":
+    case "mental_health":
+    case "rehabilitation":
+    case "other_care":
+      return 2;
 
-    doctor: 3,
-    dentist: 3,
-    physiotherapy: 3,
-    pharmacy: 3,
-    home_care: 3,
-    other_care: 3,
+    case "doctor":
+    case "dentist":
+    case "physiotherapy":
+    case "pharmacy":
+      return 3;
 
-    place_of_worship: 4,
-    community_centre: 4,
+    case "school":
+    case "daycare":
+      return 4;
 
-    sports: 5,
-    hotel: 6,
+    case "place_of_worship":
+      return 5;
 
-    supermarket: 7,
-    marketplace: 7,
+    case "community_centre":
+    case "sports":
+      return 6;
 
-    other: 8,
-  };
+    case "hotel":
+      return 7;
 
-  return priorities[type] || 99;
+    case "supermarket":
+    case "marketplace":
+      return 8;
+
+    default:
+      return 9;
+  }
 }
 
 function isCareType(type) {
@@ -421,24 +426,25 @@ function isCareType(type) {
 }
 
 // ============================================================
-// MATCHING
+// NAME / ADDRESS MATCHING
 // ============================================================
 
-function namesMatch(name1, name2) {
-  const a = normalizeText(name1);
-  const b = normalizeText(name2);
+function namesMatch(a, b) {
+  const first = normalizeText(a);
+  const second = normalizeText(b);
 
-  if (!a || !b) {
+  if (!first || !second) {
     return false;
   }
 
-  if (a === b) {
+  if (first === second) {
     return true;
   }
 
   if (
-    a.includes(b) ||
-    b.includes(a)
+    first.length >= 5 &&
+    second.length >= 5 &&
+    (first.includes(second) || second.includes(first))
   ) {
     return true;
   }
@@ -446,50 +452,83 @@ function namesMatch(name1, name2) {
   return false;
 }
 
-function addressesMatch(a, b) {
-  if (!a || !b) {
+function addressesMatch(osm, bag) {
+  if (!osm || !bag) {
     return false;
   }
 
-  const streetA =
-    normalizeStreet(a.street);
+  const osmStreet = normalizeStreet(
+    osm.address?.street || osm.tags?.["addr:street"]
+  );
 
-  const streetB =
-    normalizeStreet(b.street);
+  const bagStreet = normalizeStreet(
+    bag.properties?.openbare_ruimte_naam ||
+      bag.properties?.["openbare_ruimte_naam"]
+  );
 
-  const houseA =
-    normalizeHouseNumber(
-      a.housenumber
-    );
+  const osmNumber = normalizeHouseNumber(
+    osm.address?.housenumber ||
+      osm.tags?.["addr:housenumber"]
+  );
 
-  const houseB =
-    normalizeHouseNumber(
-      b.housenumber
-    );
+  const bagNumber = normalizeHouseNumber(
+    bag.properties?.huisnummer
+  );
 
-  if (
-    streetA &&
-    streetB &&
-    houseA &&
-    houseB &&
-    streetA === streetB &&
-    houseA === houseB
-  ) {
-    return true;
+  if (!osmStreet || !bagStreet || !osmNumber || !bagNumber) {
+    return false;
   }
 
-  return false;
+  return (
+    osmStreet === bagStreet &&
+    osmNumber === bagNumber
+  );
 }
 
 // ============================================================
 // OVERPASS
 // ============================================================
 
-async function queryOverpass(
-  latitude,
-  longitude,
-  radius
-) {
+async function queryOneOverpassServer(server, timeoutMs, query) {
+  console.log(
+    `Overpass proberen: ${server} (timeout ${timeoutMs} ms)`
+  );
+
+  const controller = new AbortController();
+
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    const response = await fetch(server, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Omgevingsscan/1.0",
+      },
+      body: `data=${encodeURIComponent(query)}`,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    const elements = data.elements || [];
+
+    console.log(
+      `Overpass succesvol via ${server}: ${elements.length} objecten`
+    );
+
+    return elements;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function queryOverpass(latitude, longitude, radius) {
   const query = `
 [out:json][timeout:25];
 
@@ -518,111 +557,661 @@ async function queryOverpass(
 out center tags;
 `;
 
-  const allElements = [];
+  for (let i = 0; i < OVERPASS_SERVERS.length; i++) {
+    const server = OVERPASS_SERVERS[i];
+    const timeoutMs = OVERPASS_TIMEOUTS[i] || 10000;
 
-  for (const server of OVERPASS_SERVERS) {
     try {
-      console.log(
-        `Overpass proberen: ${server}`
+      return await queryOneOverpassServer(
+        server,
+        timeoutMs,
+        query
       );
-
-      const controller =
-        new AbortController();
-
-      const timeout =
-        setTimeout(
-          () => controller.abort(),
-          20000
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        console.log(
+          `Overpass timeout bij ${server} na ${timeoutMs} ms`
         );
-
-      const response =
-        await fetch(
-          server,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/x-www-form-urlencoded",
-              "User-Agent":
-                "Omgevingsscan/1.0",
-            },
-            body:
-              `data=${encodeURIComponent(query)}`,
-            signal:
-              controller.signal,
-          }
-        );
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        throw new Error(
-          `HTTP ${response.status}`
+      } else {
+        console.log(
+          `Overpass fout bij ${server}: ${error.message}`
         );
       }
-
-      const data =
-        await response.json();
-
-      const elements =
-        data.elements || [];
-
-      console.log(
-        `Overpass succesvol: ${elements.length} objecten`
-      );
-
-      allElements.push(
-        ...elements
-      );
-
-    } catch (error) {
-      console.log(
-        `Overpass fout bij ${server}: ${error.message}`
-      );
     }
   }
-
-  const unique = new Map();
-
-  for (const element of allElements) {
-    const key =
-      `${element.type}-${element.id}`;
-
-    if (!unique.has(key)) {
-      unique.set(
-        key,
-        element
-      );
-    }
-  }
-
-  const result =
-    Array.from(unique.values());
 
   console.log(
-    `Overpass totaal: ${allElements.length} objecten, ${result.length} unieke objecten`
+    "Geen enkele Overpass-server kon worden gebruikt."
   );
 
-  return result;
+  return [];
 }
 
 // ============================================================
-// OSM VERWERKEN
+// PROCESS OSM
 // ============================================================
 
-function processOSMObjects(
-  elements,
-  latitude,
-  longitude,
-  radius
-) {
-  const objects = [];
+function processOSMObjects(elements, latitude, longitude) {
+  const results = [];
 
   for (const element of elements) {
-    const coordinates =
-      getElementCoordinates(element);
+    const coordinates = getElementCoordinates(element);
 
     if (!coordinates) {
+      continue;
+    }
+
+    const tags = element.tags || {};
+
+    const type = getObjectType(tags);
+
+    if (type === "other") {
+      continue;
+    }
+
+    const distance = distanceMeters(
+      latitude,
+      longitude,
+      coordinates.latitude,
+      coordinates.longitude
+    );
+
+    const address = {
+      street:
+        tags["addr:street"] ||
+        tags["addr:place"] ||
+        null,
+
+      housenumber:
+        tags["addr:housenumber"] ||
+        null,
+
+      postcode:
+        tags["addr:postcode"] ||
+        null,
+
+      city:
+        tags["addr:city"] ||
+        tags["addr:town"] ||
+        tags["addr:village"] ||
+        null,
+    };
+
+    const name =
+      tags.name ||
+      tags["official_name"] ||
+      tags["alt_name"] ||
+      `${type}`;
+
+    results.push({
+      id: `${element.type}-${element.id}`,
+      name,
+      type,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+      distance,
+      priority: priorityForType(type),
+      address,
+      source: "OSM",
+      confidence:
+        type === "other_care"
+          ? "medium"
+          : "high",
+      tags,
+    });
+  }
+
+  return results;
+}
+
+// ============================================================
+// BAG
+// ============================================================
+
+async function queryBAG(latitude, longitude, radius) {
+  const baseUrl =
+    "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/verblijfsobject/items";
+
+  const results = [];
+
+  const deltaLat = radius / 111320;
+  const deltaLon =
+    radius /
+    (111320 * Math.cos((latitude * Math.PI) / 180));
+
+  const minLon = longitude - deltaLon;
+  const minLat = latitude - deltaLat;
+  const maxLon = longitude + deltaLon;
+  const maxLat = latitude + deltaLat;
+
+  const limit = 1000;
+  let page = 1;
+
+  let nextUrl =
+    `${baseUrl}` +
+    `?bbox=${minLon},${minLat},${maxLon},${maxLat}` +
+    `&limit=${limit}` +
+    `&f=json`;
+
+  console.log(
+    `BAG proberen binnen ${radius} meter...`
+  );
+
+  while (page <= 10 && nextUrl) {
+    console.log(
+      `BAG pagina ${page} ophalen...`
+    );
+
+    try {
+      const response = await fetch(nextUrl, {
+        headers: {
+          Accept: "application/geo+json",
+          "User-Agent": "Omgevingsscan/1.0",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `BAG HTTP ${response.status}`
+        );
+      }
+
+      const data = await response.json();
+      const features = data.features || [];
+
+      console.log(
+        `BAG pagina ${page}: ${features.length} objecten`
+      );
+
+      results.push(...features);
+
+      // --------------------------------------------------------
+      // BAG gebruikt cursor-based pagination.
+      // De API geeft zelf een next-link terug.
+      // --------------------------------------------------------
+
+      const nextLink =
+        Array.isArray(data.links)
+          ? data.links.find(
+              (link) =>
+                link &&
+                link.rel === "next" &&
+                link.href
+            )
+          : null;
+
+      if (!nextLink) {
+        nextUrl = null;
+        break;
+      }
+
+      nextUrl = nextLink.href;
+      page++;
+    } catch (error) {
+      console.log(
+        `BAG fout: ${error.message}`
+      );
+      break;
+    }
+  }
+
+  console.log(
+    `BAG succesvol: ${results.length} verblijfsobjecten`
+  );
+
+  return results;
+}
+
+// ============================================================
+// BAG HELPERS
+// ============================================================
+
+function getBAGType(feature) {
+  const properties = feature?.properties || {};
+
+  const gebruiksdoel =
+    properties.gebruiksdoel ||
+    properties["gebruiksdoel"];
+
+  if (Array.isArray(gebruiksdoel)) {
+    const values = gebruiksdoel.map((x) =>
+      normalizeText(x)
+    );
+
+    if (
+      values.some(
+        (x) =>
+          x.includes("gezondheidszorg") ||
+          x.includes("medisch")
+      )
+    ) {
+      return "healthcare";
+    }
+
+    if (
+      values.some(
+        (x) =>
+          x.includes("onderwijs")
+      )
+    ) {
+      return "school";
+    }
+
+    if (
+      values.some(
+        (x) =>
+          x.includes("bijeenkomst")
+      )
+    ) {
+      return "community";
+    }
+
+    if (
+      values.some(
+        (x) =>
+          x.includes("logies")
+      )
+    ) {
+      return "hotel";
+    }
+
+    if (
+      values.some(
+        (x) =>
+          x.includes("winkelfunctie")
+      )
+    ) {
+      return "shop";
+    }
+  }
+
+  return null;
+}
+
+function getBAGPandHref(feature) {
+  const properties =
+    feature?.properties || {};
+
+  const value =
+    properties["pand.href"];
+
+  if (Array.isArray(value)) {
+    return value[0]
+      ? String(value[0]).trim()
+      : "";
+  }
+
+  if (!value) {
+    return "";
+  }
+
+  return String(value).trim();
+}
+
+function getBAGPandId(feature) {
+  const href = getBAGPandHref(feature);
+
+  if (!href) {
+    return "";
+  }
+
+  try {
+    const cleanHref =
+      href.split("?")[0];
+
+    const parts =
+      cleanHref
+        .split("/")
+        .filter(Boolean);
+
+    return parts.length
+      ? decodeURIComponent(
+          parts[parts.length - 1]
+        ).trim()
+      : "";
+  } catch {
+    return "";
+  }
+}
+
+// ============================================================
+// BAG PAND
+// ============================================================
+
+async function queryBAGPand(href) {
+  if (!href) {
+    return null;
+  }
+
+  if (bagPandCache.has(href)) {
+    return bagPandCache.get(href);
+  }
+
+  if (bagPandPromiseCache.has(href)) {
+    return bagPandPromiseCache.get(href);
+  }
+
+  const promise = (async () => {
+    console.log(
+      `BAG pand ophalen: ${href}`
+    );
+
+    const controller =
+      new AbortController();
+
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, 8000);
+
+    try {
+      const response = await fetch(
+        href,
+        {
+          headers: {
+            Accept:
+              "application/geo+json",
+            "User-Agent":
+              "Omgevingsscan/1.0",
+          },
+          signal: controller.signal,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `BAG pand HTTP ${response.status}`
+        );
+      }
+
+      const feature =
+        await response.json();
+
+      const properties =
+        feature?.properties || {};
+
+      const pandData = {
+        identificatie:
+          properties.identificatie ||
+          properties["identificatie"] ||
+          null,
+
+        bouwjaar:
+          properties.bouwjaar ??
+          null,
+
+        aantal_verblijfsobjecten:
+          properties.aantal_verblijfsobjecten ??
+          null,
+
+        gebruiksdoel:
+          properties.gebruiksdoel ||
+          null,
+
+        status:
+          properties.status ||
+          null,
+      };
+
+      bagPandCache.set(
+        href,
+        pandData
+      );
+
+      return pandData;
+    } catch (error) {
+      console.log(
+        `BAG pand fout bij ${href}: ${error.message}`
+      );
+
+      return null;
+    } finally {
+      clearTimeout(timeout);
+      bagPandPromiseCache.delete(href);
+    }
+  })();
+
+  bagPandPromiseCache.set(
+    href,
+    promise
+  );
+
+  return promise;
+}
+
+// ============================================================
+// BEST BAG MATCH
+// ============================================================
+
+function getBestBAGFeatureForOSM(
+  osm,
+  bagFeatures
+) {
+  if (!osm || !bagFeatures?.length) {
+    return null;
+  }
+
+  const osmBagRef =
+    osm.tags?.["ref:bag"] ||
+    osm.tags?.["ref:bag:verblijfsobject"];
+
+  if (osmBagRef) {
+    const direct =
+      bagFeatures.find((feature) => {
+        const id =
+          feature?.properties?.identificatie;
+
+        return (
+          id &&
+          String(id) ===
+            String(osmBagRef)
+        );
+      });
+
+    if (direct) {
+      return direct;
+    }
+  }
+
+  const osmPandRef =
+    osm.tags?.["ref:bag:pand"];
+
+  if (osmPandRef) {
+    const directPand =
+      bagFeatures.find(
+        (feature) =>
+          getBAGPandId(feature) ===
+          String(osmPandRef)
+      );
+
+    if (directPand) {
+      return directPand;
+    }
+  }
+
+  const addressMatch =
+    bagFeatures.find((feature) =>
+      addressesMatch(
+        osm,
+        feature
+      )
+    );
+
+  if (addressMatch) {
+    return addressMatch;
+  }
+
+  let closest = null;
+  let closestDistance = Infinity;
+
+  for (const feature of bagFeatures) {
+    const coordinates =
+      getElementCoordinates(
+        feature
+      );
+
+    if (!coordinates) {
+      continue;
+    }
+
+    const distance =
+      distanceMeters(
+        osm.latitude,
+        osm.longitude,
+        coordinates.latitude,
+        coordinates.longitude
+      );
+
+    if (
+      distance <= 15 &&
+      distance < closestDistance
+    ) {
+      closest = feature;
+      closestDistance = distance;
+    }
+  }
+
+  return closest;
+}
+
+// ============================================================
+// REQUIRED BAG PAND HREFS
+// ============================================================
+
+function collectRequiredBAGPandHrefs(
+  osmObjects,
+  bagFeatures
+) {
+  const required =
+    new Set();
+
+  for (const feature of bagFeatures) {
+    const type =
+      getBAGType(feature);
+
+    if (!type) {
+      continue;
+    }
+
+    const href =
+      getBAGPandHref(feature);
+
+    if (href) {
+      required.add(href);
+    }
+  }
+
+  for (const osm of osmObjects) {
+    const best =
+      getBestBAGFeatureForOSM(
+        osm,
+        bagFeatures
+      );
+
+    if (!best) {
+      continue;
+    }
+
+    const href =
+      getBAGPandHref(best);
+
+    if (href) {
+      required.add(href);
+    }
+  }
+
+  return [...required];
+}
+
+// ============================================================
+// ENRICH BAG FEATURES WITH PAND
+// ============================================================
+
+async function enrichBAGFeaturesWithPand(
+  features,
+  requiredHrefs
+) {
+  console.log(
+    `BAG: ${requiredHrefs.length} benodigde panden geselecteerd`
+  );
+
+  const concurrency = 15;
+
+  for (
+    let i = 0;
+    i < requiredHrefs.length;
+    i += concurrency
+  ) {
+    const batch =
+      requiredHrefs.slice(
+        i,
+        i + concurrency
+      );
+
+    await Promise.all(
+      batch.map(async (href) => {
+        const pand =
+          await queryBAGPand(href);
+
+        if (!pand) {
+          return;
+        }
+
+        for (const feature of features) {
+          if (
+            getBAGPandHref(feature) ===
+            href
+          ) {
+            feature.pand = pand;
+          }
+        }
+      })
+    );
+  }
+
+  const enriched =
+    features.filter(
+      (feature) =>
+        feature.pand
+    ).length;
+
+  console.log(
+    `BAG pandverrijking gereed: ${requiredHrefs.length} nieuwe panden opgehaald`
+  );
+
+  console.log(
+    `BAG pandgegevens gekoppeld aan ${enriched} verblijfsobjecten`
+  );
+
+  console.log(
+    `BAG pandcache bevat: ${bagPandCache.size} panden`
+  );
+}
+
+// ============================================================
+// PROCESS BAG OBJECTS
+// ============================================================
+
+function processBAGObjects(
+  bagFeatures,
+  latitude,
+  longitude
+) {
+  const results = [];
+
+  for (const feature of bagFeatures) {
+    const coordinates =
+      getElementCoordinates(
+        feature
+      );
+
+    if (!coordinates) {
+      continue;
+    }
+
+    const type =
+      getBAGType(feature);
+
+    if (!type) {
       continue;
     }
 
@@ -634,40 +1223,37 @@ function processOSMObjects(
         coordinates.longitude
       );
 
-    if (distance > radius) {
-      continue;
-    }
-
-    const tags =
-      element.tags || {};
-
-    const type =
-      getObjectType(tags);
+    const properties =
+      feature.properties || {};
 
     const street =
-      tags["addr:street"] || "";
+      properties.openbare_ruimte_naam ||
+      properties["openbare_ruimte_naam"] ||
+      null;
 
     const housenumber =
-      tags["addr:housenumber"] || "";
+      properties.huisnummer ||
+      null;
 
     const postcode =
-      tags["addr:postcode"] || "";
+      properties.postcode ||
+      null;
 
     const city =
-      tags["addr:city"] ||
-      tags["addr:town"] ||
-      tags["addr:village"] ||
-      "";
+      properties.woonplaats_naam ||
+      null;
 
     const name =
-      tags.name ||
-      tags.operator ||
-      tags.official_name ||
-      "Onbekend object";
+      street && housenumber
+        ? `${street} ${housenumber}`
+        : `${type}`;
 
-    objects.push({
+    results.push({
       id:
-        `${element.type}-${element.id}`,
+        properties.identificatie ||
+        `bag-${Math.random()
+          .toString(36)
+          .slice(2)}`,
 
       name,
 
@@ -691,845 +1277,151 @@ function processOSMObjects(
         city,
       },
 
-      source: "OSM",
-
-      confidence:
-        type === "other_care"
-          ? "medium"
-          : "high",
-
-      tags,
-    });
-  }
-
-  console.log(
-    `OSM verwerkt: ${objects.length} relevante objecten`
-  );
-
-  return objects;
-}
-
-// ============================================================
-// BAG VERBLIJFSOBJECTEN
-// ============================================================
-
-async function queryBAG(
-  latitude,
-  longitude,
-  radius
-) {
-  const baseUrl =
-    "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/verblijfsobject/items";
-
-  const latDelta =
-    radius / 111000;
-
-  const lonDelta =
-    radius /
-    (
-      111000 *
-      Math.cos(
-        latitude * Math.PI / 180
-      )
-    );
-
-  const bbox =
-    `${longitude - lonDelta},` +
-    `${latitude - latDelta},` +
-    `${longitude + lonDelta},` +
-    `${latitude + latDelta}`;
-
-  let url =
-    `${baseUrl}?f=json` +
-    `&limit=1000` +
-    `&bbox=${bbox}`;
-
-  const allFeatures = [];
-
-  let page = 1;
-
-  try {
-    console.log(
-      `BAG proberen binnen ${radius} meter...`
-    );
-
-    while (url) {
-      console.log(
-        `BAG pagina ${page} ophalen...`
-      );
-
-      const response =
-        await fetch(
-          url,
-          {
-            headers: {
-              Accept:
-                "application/geo+json",
-              "User-Agent":
-                "Omgevingsscan/1.0",
-            },
-          }
-        );
-
-      if (!response.ok) {
-        throw new Error(
-          `BAG HTTP ${response.status}`
-        );
-      }
-
-      const data =
-        await response.json();
-
-      const features =
-        data.features || [];
-
-      allFeatures.push(
-        ...features
-      );
-
-      console.log(
-        `BAG pagina ${page}: ${features.length} objecten`
-      );
-
-      const nextLink =
-        data.links?.find(
-          (link) =>
-            link.rel === "next" &&
-            link.href
-        )?.href || null;
-
-      url =
-        nextLink;
-
-      page++;
-
-      if (page > 10) {
-        console.log(
-          "BAG veiligheidslimiet van 10 pagina's bereikt."
-        );
-
-        break;
-      }
-    }
-
-    console.log(
-      `BAG succesvol: ${allFeatures.length} verblijfsobjecten`
-    );
-
-    return allFeatures;
-
-  } catch (error) {
-    console.log(
-      `BAG fout: ${error.message}`
-    );
-
-    return [];
-  }
-}
-
-// ============================================================
-// BAG PAND OPHALEN
-// ============================================================
-
-async function queryBAGPand(pandHref) {
-  if (!pandHref) {
-    return null;
-  }
-
-  try {
-    console.log(
-      `BAG pand ophalen: ${pandHref}`
-    );
-
-    const response =
-      await fetch(
-        pandHref,
-        {
-          headers: {
-            Accept:
-              "application/geo+json",
-            "User-Agent":
-              "Omgevingsscan/1.0",
-          },
-        }
-      );
-
-    if (!response.ok) {
-      throw new Error(
-        `BAG pand HTTP ${response.status}`
-      );
-    }
-
-    const data =
-      await response.json();
-
-    return data;
-
-  } catch (error) {
-    console.log(
-      `BAG pand fout: ${error.message}`
-    );
-
-    return null;
-  }
-}
-
-// ============================================================
-// BAG PAND GEGEVENS
-// ============================================================
-
-async function enrichBAGFeaturesWithPand(
-  features
-) {
-  const cache =
-    new Map();
-
-  let processed = 0;
-
-  for (const feature of features) {
-    const properties =
-      feature.properties || {};
-
-    const pandHref =
-      Array.isArray(
-        properties["pand.href"]
-      )
-        ? properties["pand.href"][0]
-        : properties["pand.href"];
-
-    if (!pandHref) {
-      continue;
-    }
-
-    if (
-      cache.has(pandHref)
-    ) {
-      feature.pand =
-        cache.get(pandHref);
-
-      continue;
-    }
-
-    const pand =
-      await queryBAGPand(
-        pandHref
-      );
-
-    if (!pand) {
-      continue;
-    }
-
-    const pandProperties =
-      pand.properties || {};
-
-    const pandData = {
-      identificatie:
-        pandProperties.identificatie ||
-        null,
-
-      bouwjaar:
-        pandProperties.bouwjaar ||
-        null,
-
-      aantal_verblijfsobjecten:
-        pandProperties.aantal_verblijfsobjecten ||
-        null,
-
-      gebruiksdoel:
-        pandProperties.gebruiksdoel ||
-        null,
-
-      status:
-        pandProperties.status ||
-        null,
-    };
-
-    cache.set(
-      pandHref,
-      pandData
-    );
-
-    feature.pand =
-      pandData;
-
-    processed++;
-
-    console.log(
-      `BAG pand verwerkt: ${processed}`
-    );
-  }
-
-  console.log(
-    `BAG pandverrijking gereed: ${processed} panden`
-  );
-
-  return features;
-}
-
-// ============================================================
-// BAG STATUS
-// ============================================================
-
-function isActiveBAGObject(feature) {
-  const properties =
-    feature.properties || {};
-
-  const status =
-    normalizeText(
-      properties.status
-    );
-
-  if (
-    status.includes("ingetrokken") ||
-    status.includes("buiten gebruik") ||
-    status.includes("verbouwing") ||
-    status.includes("ten onrechte") ||
-    status.includes("niet gerealiseerd")
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
-// ============================================================
-// BAG TYPE
-// ============================================================
-
-function getBAGType(feature) {
-  const properties =
-    feature.properties || {};
-
-  const gebruiksdoel =
-    properties.gebruiksdoel;
-
-  if (!gebruiksdoel) {
-    return null;
-  }
-
-  const text =
-    Array.isArray(gebruiksdoel)
-      ? gebruiksdoel
-          .join(" ")
-          .toLowerCase()
-      : String(
-          gebruiksdoel
-        ).toLowerCase();
-
-  if (
-    text.includes(
-      "onderwijsfunctie"
-    )
-  ) {
-    return "school";
-  }
-
-  if (
-    text.includes(
-      "sportfunctie"
-    )
-  ) {
-    return "sports";
-  }
-
-  if (
-    text.includes(
-      "logiesfunctie"
-    )
-  ) {
-    return "hotel";
-  }
-
-  if (
-    text.includes(
-      "bijeenkomstfunctie"
-    )
-  ) {
-    const combined =
-      normalizeText(
-        [
-          properties.openbare_ruimte_naam,
-          properties.woonplaats_naam,
-        ]
-          .filter(Boolean)
-          .join(" ")
-      );
-
-    if (
-      combined.includes("kerk") ||
-      combined.includes("moskee") ||
-      combined.includes("synagoge") ||
-      combined.includes("buurthuis") ||
-      combined.includes("wijkcentrum") ||
-      combined.includes("dorpshuis")
-    ) {
-      return "place_of_worship";
-    }
-  }
-
-  return null;
-}
-
-// ============================================================
-// BAG ADRES MAKEN
-// ============================================================
-
-function getBAGAddress(feature) {
-  const properties =
-    feature.properties || {};
-
-  const street =
-    properties.openbare_ruimte_naam ||
-    "";
-
-  const housenumber =
-    properties.huisnummer ||
-    "";
-
-  const houseletter =
-    properties.huisletter ||
-    "";
-
-  const toevoeging =
-    properties.toevoeging ||
-    "";
-
-  const postcode =
-    properties.postcode ||
-    "";
-
-  const city =
-    properties.woonplaats_naam ||
-    "";
-
-  let fullHouseNumber =
-    String(
-      housenumber
-    );
-
-  if (houseletter) {
-    fullHouseNumber +=
-      String(
-        houseletter
-      );
-  }
-
-  if (toevoeging) {
-    fullHouseNumber +=
-      `-${toevoeging}`;
-  }
-
-  return {
-    street,
-    housenumber:
-      fullHouseNumber,
-    postcode,
-    city,
-  };
-}
-
-// ============================================================
-// BAG COORDINATEN
-// ============================================================
-
-function getBAGCoordinates(feature) {
-  if (
-    !feature.geometry ||
-    feature.geometry.type !== "Point"
-  ) {
-    return null;
-  }
-
-  const coordinates =
-    feature.geometry.coordinates;
-
-  if (
-    !Array.isArray(coordinates) ||
-    coordinates.length < 2
-  ) {
-    return null;
-  }
-
-  const longitude =
-    Number(coordinates[0]);
-
-  const latitude =
-    Number(coordinates[1]);
-
-  if (
-    !Number.isFinite(latitude) ||
-    !Number.isFinite(longitude)
-  ) {
-    return null;
-  }
-
-  return {
-    latitude,
-    longitude,
-  };
-}
-
-// ============================================================
-// BAG OBJECTEN VERWERKEN
-// ============================================================
-
-function processBAGObjects(
-  features,
-  latitude,
-  longitude,
-  radius
-) {
-  const objects = [];
-
-  for (const feature of features) {
-    if (
-      !isActiveBAGObject(feature)
-    ) {
-      continue;
-    }
-
-    const type =
-      getBAGType(feature);
-
-    if (!type) {
-      continue;
-    }
-
-    const coordinates =
-      getBAGCoordinates(feature);
-
-    if (!coordinates) {
-      continue;
-    }
-
-    const distance =
-      distanceMeters(
-        latitude,
-        longitude,
-        coordinates.latitude,
-        coordinates.longitude
-      );
-
-    if (distance > radius) {
-      continue;
-    }
-
-    const properties =
-      feature.properties || {};
-
-    const address =
-      getBAGAddress(feature);
-
-    const addressParts = [
-      address.street,
-      address.housenumber,
-      address.postcode,
-      address.city,
-    ].filter(Boolean);
-
-    const name =
-      addressParts.join(" ") ||
-      "BAG object";
-
-    objects.push({
-      id:
-        `bag-${properties.identificatie || Math.random()}`,
-
-      name,
-
-      type,
-
-      latitude:
-        coordinates.latitude,
-
-      longitude:
-        coordinates.longitude,
-
-      distance,
-
-      priority:
-        priorityForType(type),
-
-      address,
-
       source: "BAG",
 
       confidence: "medium",
 
-      bag: properties,
+      tags: properties,
+
+      bag: {
+        ...properties,
+        verblijfsobject_id:
+          properties.identificatie ||
+          null,
+      },
 
       pand:
-        feature.pand || null,
+        feature.pand ||
+        null,
     });
   }
 
-  console.log(
-    `BAG verwerkt: ${objects.length} relevante objecten`
-  );
-
-  return objects;
+  return results;
 }
 
 // ============================================================
-// OSM + BAG KOPPELEN
-// ============================================================
-//
-// We gebruiken ALLE BAG-verblijfsobjecten.
-//
-// ref:bag kan in OSM verwijzen naar:
-// - een BAG verblijfsobject-ID
-// - een BAG pand-ID
-//
-// Daarom bouwen we twee indexen.
-//
-// Matchvolgorde:
-// 1. ref:bag -> verblijfsobject-ID
-// 2. ref:bag -> pand-ID
-// 3. exact adres
-// 4. afstand <= 15 meter als OSM geen straat heeft
+// ENRICH OSM WITH BAG
 // ============================================================
 
 function enrichOSMWithBAG(
   osmObjects,
   bagFeatures
 ) {
-  let linked = 0;
-  let directRefMatches = 0;
-  let pandRefMatches = 0;
-  let addressMatches = 0;
-  let distanceMatches = 0;
-
-  // --------------------------------------------------------
-  // BAG indexen
-  // --------------------------------------------------------
-
-  const bagByVoId =
+  const bagByVOId =
     new Map();
 
   const bagByPandId =
     new Map();
 
   for (const feature of bagFeatures) {
-    if (
-      !isActiveBAGObject(feature)
-    ) {
-      continue;
-    }
-
     const properties =
       feature.properties || {};
 
-    // ------------------------------------------------------
-    // BAG verblijfsobject-ID
-    // ------------------------------------------------------
-
-    const verblijfsobjectId =
+    const voId =
       properties.identificatie;
 
-    if (verblijfsobjectId) {
-      bagByVoId.set(
-        String(verblijfsobjectId).trim(),
+    if (voId) {
+      bagByVOId.set(
+        String(voId),
         feature
       );
     }
 
-    // ------------------------------------------------------
-    // BAG pand-ID
-    //
-    // OSM ref:bag verwijst vaak naar het pand.
-    // ------------------------------------------------------
-
     const pandId =
-      feature.pand?.identificatie;
+      getBAGPandId(feature);
 
-    if (
-      pandId &&
-      !bagByPandId.has(
-        String(pandId).trim()
-      )
-    ) {
-      bagByPandId.set(
-        String(pandId).trim(),
-        feature
-      );
+    if (pandId) {
+      if (
+        !bagByPandId.has(pandId)
+      ) {
+        bagByPandId.set(
+          pandId,
+          []
+        );
+      }
+
+      bagByPandId
+        .get(pandId)
+        .push(feature);
     }
   }
 
   console.log(
-    `BAG index: ${bagByVoId.size} verblijfsobjecten, ${bagByPandId.size} panden`
+    `BAG index: ${bagByVOId.size} verblijfsobjecten, ${bagByPandId.size} panden`
   );
 
-  // --------------------------------------------------------
-  // OSM objecten koppelen
-  // --------------------------------------------------------
+  let directVOMatches = 0;
+  let directPandMatches = 0;
+  let addressMatches = 0;
+  let distanceMatches = 0;
+
+  let enrichedCount = 0;
 
   for (const osm of osmObjects) {
     let bestFeature = null;
-    let bestDistance = Infinity;
 
-    // ======================================================
-    // 1. DIRECTE KOPPELING VIA ref:bag
-    // ======================================================
+    const osmBagRef =
+      osm.tags?.["ref:bag"] ||
+      osm.tags?.["ref:bag:verblijfsobject"];
 
-    const refBag =
-      osm.tags?.["ref:bag"];
-
-    if (refBag) {
-      const refValue =
-        String(refBag).trim();
-
-      // ----------------------------------------------------
-      // 1A. ref:bag = BAG verblijfsobject-ID
-      // ----------------------------------------------------
-
-      const voFeature =
-        bagByVoId.get(
-          refValue
+    if (osmBagRef) {
+      bestFeature =
+        bagByVOId.get(
+          String(osmBagRef)
         );
 
-      if (voFeature) {
-        bestFeature =
-          voFeature;
-
-        const coordinates =
-          getBAGCoordinates(
-            voFeature
-          );
-
-        if (coordinates) {
-          bestDistance =
-            distanceMeters(
-              osm.latitude,
-              osm.longitude,
-              coordinates.latitude,
-              coordinates.longitude
-            );
-        }
-
-        directRefMatches++;
-
-        console.log(
-          `BAG directe VO-match: ${osm.name} -> ${refValue}`
-        );
-      }
-
-      // ----------------------------------------------------
-      // 1B. ref:bag = BAG pand-ID
-      // ----------------------------------------------------
-
-      if (!bestFeature) {
-        const pandFeature =
-          bagByPandId.get(
-            refValue
-          );
-
-        if (pandFeature) {
-          bestFeature =
-            pandFeature;
-
-          const coordinates =
-            getBAGCoordinates(
-              pandFeature
-            );
-
-          if (coordinates) {
-            bestDistance =
-              distanceMeters(
-                osm.latitude,
-                osm.longitude,
-                coordinates.latitude,
-                coordinates.longitude
-              );
-          }
-
-          pandRefMatches++;
-
-          console.log(
-            `BAG directe pand-match: ${osm.name} -> pand ${refValue}`
-          );
-        }
+      if (bestFeature) {
+        directVOMatches++;
       }
     }
 
-    // ======================================================
-    // 2. MATCHEN OP ADRES
-    // ======================================================
+    if (!bestFeature) {
+      const osmPandRef =
+        osm.tags?.["ref:bag:pand"];
+
+      if (osmPandRef) {
+        const candidates =
+          bagByPandId.get(
+            String(osmPandRef)
+          );
+
+        if (
+          candidates &&
+          candidates.length
+        ) {
+          bestFeature =
+            candidates[0];
+
+          directPandMatches++;
+        }
+      }
+    }
 
     if (!bestFeature) {
       for (const feature of bagFeatures) {
         if (
-          !isActiveBAGObject(feature)
-        ) {
-          continue;
-        }
-
-        const bagAddress =
-          getBAGAddress(
+          addressesMatch(
+            osm,
             feature
-          );
-
-        if (
-          !addressesMatch(
-            osm.address,
-            bagAddress
           )
         ) {
-          continue;
-        }
-
-        const coordinates =
-          getBAGCoordinates(
-            feature
-          );
-
-        if (!coordinates) {
-          continue;
-        }
-
-        const d =
-          distanceMeters(
-            osm.latitude,
-            osm.longitude,
-            coordinates.latitude,
-            coordinates.longitude
-          );
-
-        if (
-          d < bestDistance
-        ) {
-          bestDistance =
-            d;
-
           bestFeature =
             feature;
-        }
-      }
 
-      if (bestFeature) {
-        addressMatches++;
+          addressMatches++;
+          break;
+        }
       }
     }
 
-    // ======================================================
-    // 3. MATCHEN OP AFSTAND
-    // ======================================================
-    //
-    // Alleen wanneer OSM geen straat heeft.
-    // ======================================================
+    if (!bestFeature) {
+      let closest = null;
+      let closestDistance =
+        Infinity;
 
-    if (
-      !bestFeature &&
-      !osm.address?.street
-    ) {
       for (const feature of bagFeatures) {
-        if (
-          !isActiveBAGObject(feature)
-        ) {
-          continue;
-        }
-
         const coordinates =
-          getBAGCoordinates(
+          getElementCoordinates(
             feature
           );
 
@@ -1537,7 +1429,7 @@ function enrichOSMWithBAG(
           continue;
         }
 
-        const d =
+        const distance =
           distanceMeters(
             osm.latitude,
             osm.longitude,
@@ -1546,47 +1438,35 @@ function enrichOSMWithBAG(
           );
 
         if (
-          d <= 15 &&
-          d < bestDistance
+          distance <= 15 &&
+          distance < closestDistance
         ) {
-          bestDistance =
-            d;
-
-          bestFeature =
+          closest =
             feature;
+
+          closestDistance =
+            distance;
         }
       }
 
-      if (bestFeature) {
+      if (closest) {
+        bestFeature =
+          closest;
+
         distanceMatches++;
       }
     }
-
-    // ======================================================
-    // GEEN BAG-MATCH
-    // ======================================================
 
     if (!bestFeature) {
       continue;
     }
 
-    linked++;
-
     const bagProperties =
-      bestFeature.properties || {};
-
-    const bagAddress =
-      getBAGAddress(
-        bestFeature
-      );
-
-    // ======================================================
-    // BAG DATA AAN OSM OBJECT HANGEN
-    // ======================================================
+      bestFeature.properties ||
+      {};
 
     osm.bag = {
       ...bagProperties,
-
       verblijfsobject_id:
         bagProperties.identificatie ||
         null,
@@ -1596,80 +1476,19 @@ function enrichOSMWithBAG(
       bestFeature.pand ||
       null;
 
-    // ======================================================
-    // ONTBREKENDE ADRESGEGEVENS AANVULLEN
-    // ======================================================
-
-    if (!osm.address) {
-      osm.address = {};
-    }
-
-    if (
-      !osm.address.street &&
-      bagAddress.street
-    ) {
-      osm.address.street =
-        bagAddress.street;
-    }
-
-    if (
-      !osm.address.housenumber &&
-      bagAddress.housenumber
-    ) {
-      osm.address.housenumber =
-        bagAddress.housenumber;
-    }
-
-    if (
-      !osm.address.postcode &&
-      bagAddress.postcode
-    ) {
-      osm.address.postcode =
-        bagAddress.postcode;
-    }
-
-    if (
-      !osm.address.city &&
-      bagAddress.city
-    ) {
-      osm.address.city =
-        bagAddress.city;
-    }
-
-    // ======================================================
-    // OSM TYPE ALLEEN UPGRADEN ALS HET other_care IS
-    // ======================================================
-
-    if (
-      osm.type === "other_care"
-    ) {
-      const bagType =
-        getBAGType(
-          bestFeature
-        );
-
-      if (bagType) {
-        osm.type =
-          bagType;
-
-        osm.priority =
-          priorityForType(
-            osm.type
-          );
-      }
-    }
+    enrichedCount++;
   }
 
   console.log(
-    `OSM/BAG verrijking: ${linked} objecten gekoppeld`
+    `OSM/BAG verrijking: ${enrichedCount} objecten gekoppeld`
   );
 
   console.log(
-    `BAG directe VO-matches: ${directRefMatches}`
+    `BAG directe VO-matches: ${directVOMatches}`
   );
 
   console.log(
-    `BAG directe pand-matches: ${pandRefMatches}`
+    `BAG directe pand-matches: ${directPandMatches}`
   );
 
   console.log(
@@ -1679,176 +1498,85 @@ function enrichOSMWithBAG(
   console.log(
     `BAG afstand-matches: ${distanceMatches}`
   );
+
+  return osmObjects;
 }
 
 // ============================================================
-// DUBBELEN VERWIJDEREN
+// DEDUPLICATION
 // ============================================================
 
-function removeDuplicates(
+function deduplicateObjects(
   objects
 ) {
-  const sorted =
-    [...objects].sort(
-      (a, b) => {
-        if (
-          a.priority !==
-          b.priority
-        ) {
-          return (
-            a.priority -
-            b.priority
-          );
-        }
-
-        return (
-          a.distance -
-          b.distance
-        );
-      }
-    );
-
   const result = [];
 
-  for (const object of sorted) {
-    let duplicate =
-      false;
+  const used = new Set();
 
-    for (const existing of result) {
-      const distance =
-        distanceMeters(
-          object.latitude,
-          object.longitude,
-          existing.latitude,
-          existing.longitude
-        );
+  for (const object of objects) {
+    const key =
+      `${normalizeText(object.name)}|` +
+      `${normalizeStreet(object.address?.street)}|` +
+      `${normalizeHouseNumber(object.address?.housenumber)}`;
 
-      if (
-        isCareType(
-          object.type
-        ) ||
-        isCareType(
-          existing.type
-        )
-      ) {
-        if (
-          namesMatch(
-            object.name,
-            existing.name
-          ) &&
-          distance <= 30
-        ) {
-          duplicate = true;
-          break;
-        }
-
-        if (
-          object.source === "BAG" &&
-          distance <= 15 &&
-          (
-            !object.name ||
-            object.name === "BAG object"
-          )
-        ) {
-          duplicate = true;
-          break;
-        }
-
-        if (
-          existing.source === "BAG" &&
-          distance <= 15 &&
-          (
-            !existing.name ||
-            existing.name === "BAG object"
-          )
-        ) {
-          duplicate = true;
-          break;
-        }
-
-      } else {
-        if (
-          distance <= 30
-        ) {
-          duplicate = true;
-          break;
-        }
-      }
-
-      if (
-        distance <= 30 &&
-        addressesMatch(
-          object.address,
-          existing.address
-        )
-      ) {
-        if (
-          object.source === "BAG" ||
-          existing.source === "BAG"
-        ) {
-          duplicate = true;
-          break;
-        }
-      }
+    if (used.has(key)) {
+      continue;
     }
 
-    if (!duplicate) {
-      result.push(
-        object
-      );
-    }
+    used.add(key);
+    result.push(object);
   }
 
   return result;
 }
 
 // ============================================================
-// API
+// API ROUTE
 // ============================================================
 
 app.get(
   "/api/vulnerable-objects",
   async (req, res) => {
+    const startTime =
+      Date.now();
+
+    const latitude =
+      Number(req.query.latitude);
+
+    const longitude =
+      Number(req.query.longitude);
+
+    const radius =
+      Number(req.query.radius || 500);
+
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+      return res.status(400).json({
+        error:
+          "Ongeldige latitude of longitude",
+      });
+    }
+
+    console.log(
+      "============================================================"
+    );
+
+    console.log(
+      `Nieuwe objectscan: ${latitude}, ${longitude}, radius ${radius}m`
+    );
+
+    console.log(
+      "============================================================"
+    );
+
     try {
-      const latitude =
-        Number(
-          req.query.latitude
-        );
+      // --------------------------------------------------------
+      // OVERPASS
+      // --------------------------------------------------------
 
-      const longitude =
-        Number(
-          req.query.longitude
-        );
-
-      const radius =
-        Number(
-          req.query.radius || 500
-        );
-
-      if (
-        !Number.isFinite(
-          latitude
-        ) ||
-        !Number.isFinite(
-          longitude
-        ) ||
-        !Number.isFinite(
-          radius
-        )
-      ) {
-        return res
-          .status(400)
-          .json({
-            error:
-              "latitude, longitude en radius moeten geldige getallen zijn.",
-          });
-      }
-
-      // ------------------------------------------------------
-      // OSM / Overpass
-      // ------------------------------------------------------
-
-      const elements =
+      const osmElements =
         await queryOverpass(
           latitude,
           longitude,
@@ -1857,64 +1585,72 @@ app.get(
 
       const osmObjects =
         processOSMObjects(
-          elements,
+          osmElements,
           latitude,
-          longitude,
-          radius
+          longitude
         );
 
-      // ------------------------------------------------------
-      // BAG verblijfsobjecten
-      // ------------------------------------------------------
+      console.log(
+        `OSM verwerkt: ${osmObjects.length} relevante objecten`
+      );
 
-      let bagFeatures =
+      // --------------------------------------------------------
+      // BAG
+      // --------------------------------------------------------
+
+      const bagFeatures =
         await queryBAG(
           latitude,
           longitude,
           radius
         );
 
-      // ------------------------------------------------------
-      // BAG pandgegevens ophalen
-      // ------------------------------------------------------
+      // --------------------------------------------------------
+      // BAG PANDEN BEPALEN
+      // --------------------------------------------------------
 
-      bagFeatures =
-        await enrichBAGFeaturesWithPand(
+      const requiredPandHrefs =
+        collectRequiredBAGPandHrefs(
+          osmObjects,
           bagFeatures
         );
 
-      // ------------------------------------------------------
-      // BAG-objecten maken
-      //
-      // Alleen BAG-objecten met een herkenbaar type worden
-      // zelfstandig toegevoegd aan de lijst.
-      // ------------------------------------------------------
+      console.log(
+        `BAG: ${requiredPandHrefs.length} panden nodig voor deze scan`
+      );
+
+      await enrichBAGFeaturesWithPand(
+        bagFeatures,
+        requiredPandHrefs
+      );
+
+      // --------------------------------------------------------
+      // BAG OBJECTEN
+      // --------------------------------------------------------
 
       const bagObjects =
         processBAGObjects(
           bagFeatures,
           latitude,
-          longitude,
-          radius
+          longitude
         );
 
-      // ------------------------------------------------------
-      // BAG koppelen aan OSM
-      //
-      // We gebruiken ALLE BAG-features.
-      //
-      // Hierdoor werkt ref:bag ook wanneer deze naar
-      // een BAG pand verwijst.
-      // ------------------------------------------------------
+      console.log(
+        `BAG verwerkt: ${bagObjects.length} relevante objecten`
+      );
+
+      // --------------------------------------------------------
+      // OSM + BAG KOPPELEN
+      // --------------------------------------------------------
 
       enrichOSMWithBAG(
         osmObjects,
         bagFeatures
       );
 
-      // ------------------------------------------------------
-      // Alles combineren
-      // ------------------------------------------------------
+      // --------------------------------------------------------
+      // COMBINEREN
+      // --------------------------------------------------------
 
       const combined = [
         ...osmObjects,
@@ -1925,44 +1661,96 @@ app.get(
         `Totaal relevante objecten: ${combined.length}`
       );
 
-      const uniqueObjects =
-        removeDuplicates(
+      // --------------------------------------------------------
+      // DEDUPLICEREN
+      // --------------------------------------------------------
+
+      const deduplicated =
+        deduplicateObjects(
           combined
         );
 
       console.log(
-        `Na verwijderen duplicaten: ${uniqueObjects.length}`
+        `Na verwijderen duplicaten: ${deduplicated.length}`
+      );
+
+      // --------------------------------------------------------
+      // SORTEREN
+      // --------------------------------------------------------
+
+      deduplicated.sort(
+        (a, b) => {
+          if (
+            a.priority !==
+            b.priority
+          ) {
+            return (
+              a.priority -
+              b.priority
+            );
+          }
+
+          return (
+            a.distance -
+            b.distance
+          );
+        }
+      );
+
+      const processingTime =
+        Date.now() -
+        startTime;
+
+      console.log(
+        `Totale verwerkingstijd: ${processingTime} ms`
+      );
+
+      console.log(
+        "============================================================"
       );
 
       res.json(
-        uniqueObjects
+        deduplicated
       );
-
     } catch (error) {
       console.error(
-        "API fout:",
+        "Fout tijdens objectscan:",
         error
       );
 
-      res
-        .status(500)
-        .json({
-          error:
-            "Kon kwetsbare objecten niet ophalen.",
-        });
+      res.status(500).json({
+        error:
+          "Fout tijdens ophalen van kwetsbare objecten",
+        message:
+          error.message,
+      });
     }
   }
 );
 
 // ============================================================
-// SERVER START
+// HEALTH CHECK
+// ============================================================
+
+app.get(
+  "/api/health",
+  (req, res) => {
+    res.json({
+      status: "ok",
+      service: "omgevingsscan-backend",
+    });
+  }
+);
+
+// ============================================================
+// START SERVER
 // ============================================================
 
 app.listen(
   PORT,
   () => {
     console.log(
-      `Omgevingsscan backend draait op poort ${PORT}`
+      `Omgevingsscan backend draait op http://localhost:${PORT}`
     );
   }
 );
