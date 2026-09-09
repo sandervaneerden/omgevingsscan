@@ -1401,21 +1401,12 @@ function App() {
                     gap: "6px",
                     padding: "7px 12px",
                     borderRadius: "7px",
-                    border: enabled
-                      ? "1px solid #1976d2"
-                      : "1px solid #c7c7c7",
-                    background: enabled
-                      ? "#e8f1fb"
-                      : "#f3f3f3",
-                    color: enabled
-                      ? "#174f85"
-                      : "#777",
+                    border: "1px solid #c7c7c7",
+                    background: "#f3f3f3",
+                    color: "#000000",
                     cursor: "pointer",
                     fontSize: "13px",
-                    fontWeight: 600,
-                    opacity: enabled ? 1 : 0.65,
-                    transition:
-                      "all 0.15s ease",
+                    fontWeight: 400,
                   }}
                 >
 
@@ -1423,9 +1414,12 @@ function App() {
                     style={{
                       fontSize: "16px",
                       lineHeight: 1,
+                      color: enabled
+                        ? "#2e7d32"
+                        : "#000000",
                     }}
                   >
-                    {categoryIcon(category)}
+                    {enabled ? "☑" : "☐"}
                   </span>
 
                   <span>
