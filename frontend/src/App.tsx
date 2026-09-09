@@ -885,10 +885,10 @@ function App() {
 
   /* =======================================================
      INGEKLAPTE CATEGORIEËN
-     
+
      true = ingeklapt
      false = open
-     
+
      Standaard staan alle categorieën ingeklapt.
      ======================================================= */
 
@@ -908,10 +908,10 @@ function App() {
 
   /* =======================================================
      FILTER CATEGORIEËN
-     
+
      true = zichtbaar
      false = verborgen
-     
+
      Standaard staan alle categorieën aan.
      ======================================================= */
 
@@ -1141,7 +1141,7 @@ function App() {
 
   /* =========================================================
      OBJECTEN FILTEREN OP 500 METER + GASZONE
-     
+
      Dit is de bestaande ruimtelijke filtering.
      ========================================================= */
 
@@ -1227,7 +1227,7 @@ function App() {
 
   /* =========================================================
      CATEGORIE FILTER
-     
+
      Eerst wordt de bestaande 500m/gaszone-filter toegepast.
      Daarna wordt alleen gekeken welke categorieën zichtbaar
      zijn.
@@ -1401,9 +1401,9 @@ function App() {
                     gap: "6px",
                     padding: "7px 12px",
                     borderRadius: "7px",
-                    border: "1px solid #c7c7c7",
-                    background: "#f3f3f3",
-                    color: "#000000",
+                    border: "1px solid #3f3f3f",
+                    background: "#3f3f3f",
+                    color: "#ffffff",
                     cursor: "pointer",
                     fontSize: "13px",
                     fontWeight: 400,
@@ -1415,8 +1415,8 @@ function App() {
                       fontSize: "16px",
                       lineHeight: 1,
                       color: enabled
-                        ? "#2e7d32"
-                        : "#000000",
+                        ? "#4caf50"
+                        : "#ffffff",
                     }}
                   >
                     {enabled ? "☑" : "☐"}
