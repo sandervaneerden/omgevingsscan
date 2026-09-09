@@ -40,6 +40,7 @@ type Category =
   | "Religie"
   | "Winkels"
   | "Maatschappelijk"
+  | "Verblijf"
   | "Overig";
 
 
@@ -155,6 +156,12 @@ function categoryForType(
     case "pharmacy":
     case "physiotherapist":
     case "psychologist":
+    case "mental_health":
+    case "disabled_care":
+    case "protected_living":
+    case "hospice":
+    case "rehabilitation":
+    case "home_care":
       return "Zorg";
 
     case "school":
@@ -180,7 +187,13 @@ function categoryForType(
 
     case "community":
     case "community_centre":
+    case "social_facility":
       return "Maatschappelijk";
+
+    case "hotel":
+    case "hostel":
+    case "guest_house":
+      return "Verblijf";
 
     default:
       return "Overig";
@@ -234,6 +247,24 @@ function objectTypeName(
     case "psychologist":
       return "Psycholoog";
 
+    case "mental_health":
+      return "Geestelijke gezondheidszorg";
+
+    case "disabled_care":
+      return "Gehandicaptenzorg";
+
+    case "protected_living":
+      return "Beschermd wonen";
+
+    case "hospice":
+      return "Hospice";
+
+    case "rehabilitation":
+      return "Revalidatie";
+
+    case "home_care":
+      return "Thuiszorg";
+
     case "school":
       return "School";
 
@@ -284,6 +315,18 @@ function objectTypeName(
 
     case "community_centre":
       return "Buurt- / wijkcentrum";
+
+    case "social_facility":
+      return "Maatschappelijke voorziening";
+
+    case "hotel":
+      return "Hotel";
+
+    case "hostel":
+      return "Hostel";
+
+    case "guest_house":
+      return "Pension / gastenverblijf";
 
     default:
       return "Overig";
@@ -352,6 +395,12 @@ function iconForType(
     case "nursing_home":
     case "care_home":
     case "residential_care":
+    case "mental_health":
+    case "disabled_care":
+    case "protected_living":
+    case "hospice":
+    case "rehabilitation":
+    case "home_care":
 
       return `
         <svg
@@ -616,6 +665,7 @@ function iconForType(
 
     case "community":
     case "community_centre":
+    case "social_facility":
 
       return `
         <svg
@@ -641,6 +691,56 @@ function iconForType(
             y="17"
             width="5"
             height="6"
+            fill="white"
+          />
+        </svg>
+      `;
+
+
+    /* =====================================================
+       VERBLIJF
+       ===================================================== */
+
+    case "hotel":
+    case "hostel":
+    case "guest_house":
+
+      return `
+        <svg
+          viewBox="0 0 32 32"
+          width="28"
+          height="28"
+        >
+          <rect
+            x="5"
+            y="12"
+            width="22"
+            height="14"
+            rx="2"
+            fill="#8e24aa"
+          />
+
+          <rect
+            x="8"
+            y="15"
+            width="7"
+            height="5"
+            fill="white"
+          />
+
+          <rect
+            x="17"
+            y="15"
+            width="7"
+            height="5"
+            fill="white"
+          />
+
+          <rect
+            x="13"
+            y="21"
+            width="6"
+            height="5"
             fill="white"
           />
         </svg>
@@ -703,6 +803,9 @@ function categoryIcon(
     case "Maatschappelijk":
       return "🏢";
 
+    case "Verblijf":
+      return "🏨";
+
     case "Overig":
       return "📍";
   }
@@ -719,6 +822,7 @@ const categoryOrder: Category[] = [
   "Religie",
   "Winkels",
   "Maatschappelijk",
+  "Verblijf",
   "Overig",
 ];
 
@@ -797,6 +901,30 @@ function App() {
     Religie: true,
     Winkels: true,
     Maatschappelijk: true,
+    Verblijf: true,
+    Overig: true,
+  });
+
+
+  /* =======================================================
+     FILTER CATEGORIEËN
+     
+     true = zichtbaar
+     false = verborgen
+     
+     Standaard staan alle categorieën aan.
+     ======================================================= */
+
+  const [
+    enabledCategories,
+    setEnabledCategories
+  ] = useState<Record<Category, boolean>>({
+    Zorg: true,
+    Onderwijs: true,
+    Religie: true,
+    Winkels: true,
+    Maatschappelijk: true,
+    Verblijf: true,
     Overig: true,
   });
 
@@ -810,6 +938,23 @@ function App() {
   ) {
 
     setCollapsedCategories(
+      (previous) => ({
+        ...previous,
+        [category]: !previous[category],
+      })
+    );
+  }
+
+
+  /* =======================================================
+     CATEGORIE ZICHTBAAR / ONZICHTBAAR
+     ======================================================= */
+
+  function toggleCategoryVisibility(
+    category: Category
+  ) {
+
+    setEnabledCategories(
       (previous) => ({
         ...previous,
         [category]: !previous[category],
@@ -995,10 +1140,12 @@ function App() {
 
 
   /* =========================================================
-     OBJECTEN FILTEREN
+     OBJECTEN FILTEREN OP 500 METER + GASZONE
+     
+     Dit is de bestaande ruimtelijke filtering.
      ========================================================= */
 
-  const visibleObjects =
+  const spatiallyVisibleObjects =
     objects.filter(
       (object) => {
 
@@ -1074,6 +1221,28 @@ function App() {
           object.longitude,
           gasZone
         );
+      }
+    );
+
+
+  /* =========================================================
+     CATEGORIE FILTER
+     
+     Eerst wordt de bestaande 500m/gaszone-filter toegepast.
+     Daarna wordt alleen gekeken welke categorieën zichtbaar
+     zijn.
+     ========================================================= */
+
+  const visibleObjects =
+    spatiallyVisibleObjects.filter(
+      (object) => {
+
+        const category =
+          categoryForType(
+            object.type
+          );
+
+        return enabledCategories[category];
       }
     );
 
@@ -1187,6 +1356,89 @@ function App() {
             handleLocationFound
           }
         />
+
+
+        {/* =================================================
+            CATEGORIEFILTER
+            ================================================= */}
+
+        <div
+          className="category-filter-bar"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px",
+            marginTop: "14px",
+            alignItems: "center",
+          }}
+        >
+
+          {categoryOrder.map(
+            (category) => {
+
+              const enabled =
+                enabledCategories[category];
+
+              return (
+
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() =>
+                    toggleCategoryVisibility(
+                      category
+                    )
+                  }
+                  aria-pressed={enabled}
+                  title={
+                    enabled
+                      ? `${category} verbergen`
+                      : `${category} tonen`
+                  }
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "7px 12px",
+                    borderRadius: "7px",
+                    border: enabled
+                      ? "1px solid #1976d2"
+                      : "1px solid #c7c7c7",
+                    background: enabled
+                      ? "#e8f1fb"
+                      : "#f3f3f3",
+                    color: enabled
+                      ? "#174f85"
+                      : "#777",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    opacity: enabled ? 1 : 0.65,
+                    transition:
+                      "all 0.15s ease",
+                  }}
+                >
+
+                  <span
+                    style={{
+                      fontSize: "16px",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {categoryIcon(category)}
+                  </span>
+
+                  <span>
+                    {category}
+                  </span>
+
+                </button>
+
+              );
+            }
+          )}
+
+        </div>
 
       </section>
 
