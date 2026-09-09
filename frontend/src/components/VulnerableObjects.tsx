@@ -1,14 +1,10 @@
 import { Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 
-interface VulnerableObject {
-  id: string;
-  name: string;
-  type: string;
-  latitude: number;
-  longitude: number;
-  distance?: number;
-}
+import type {
+  VulnerableObject,
+} from "../services/vulnerableObjectService";
+
 
 interface VulnerableObjectsProps {
   latitude: number;
@@ -233,6 +229,213 @@ function labelForType(
     default:
       return "Overig";
   }
+}
+
+
+/* =========================================================
+   BAG GEBRUIKSDOEL
+   ========================================================= */
+
+function formatBAGUsePurpose(
+  value?: string | null
+): string {
+
+  if (!value) {
+    return "";
+  }
+
+
+  const labels: Record<string, string> = {
+
+    woonfunctie:
+      "Woonfunctie",
+
+    gezondheidszorgfunctie:
+      "Gezondheidszorgfunctie",
+
+    bijeenkomstfunctie:
+      "Bijeenkomstfunctie",
+
+    kantoorfunctie:
+      "Kantoorfunctie",
+
+    logiesfunctie:
+      "Logiesfunctie",
+
+    onderwijsfunctie:
+      "Onderwijsfunctie",
+
+    sportfunctie:
+      "Sportfunctie",
+
+    winkelfunctie:
+      "Winkelfunctie",
+
+    industriefunctie:
+      "Industriefunctie",
+
+    overige_gebruiksfunctie:
+      "Overige gebruiksfunctie",
+
+    celfunctie:
+      "Celfunctie",
+
+  };
+
+
+  return value
+    .split(",")
+    .map(
+      (item) =>
+        labels[item.trim()] ||
+        item.trim()
+    )
+    .join(", ");
+}
+
+
+/* =========================================================
+   TELEFOONNUMMER
+   ========================================================= */
+
+function getPhoneNumber(
+  object: VulnerableObject
+): string | null {
+
+  const tags =
+    object.tags;
+
+
+  if (!tags) {
+    return null;
+  }
+
+
+  const phone =
+    tags["contact:phone"] ||
+    tags.phone ||
+    tags["contact:mobile"] ||
+    tags.mobile;
+
+
+  return typeof phone === "string"
+    ? phone
+    : null;
+}
+
+
+/* =========================================================
+   WEBSITE
+   ========================================================= */
+
+function getWebsite(
+  object: VulnerableObject
+): string | null {
+
+  const tags =
+    object.tags;
+
+
+  if (!tags) {
+    return null;
+  }
+
+
+  const website =
+    tags["contact:website"] ||
+    tags.website;
+
+
+  return typeof website === "string"
+    ? website
+    : null;
+}
+
+
+/* =========================================================
+   ADRES
+   ========================================================= */
+
+function getAddress(
+  object: VulnerableObject
+): string | null {
+
+  const address =
+    object.address;
+
+
+  if (
+    address &&
+    (
+      address.street ||
+      address.housenumber ||
+      address.postcode ||
+      address.city
+    )
+  ) {
+
+    const parts = [
+
+      address.street,
+
+      address.housenumber !== undefined
+        ? String(address.housenumber)
+        : undefined,
+
+      address.houseletter,
+
+      address.postcode,
+
+      address.city,
+
+    ].filter(Boolean);
+
+
+    if (parts.length > 0) {
+      return parts.join(" ");
+    }
+  }
+
+
+  const bag =
+    object.bag;
+
+
+  if (
+    bag &&
+    (
+      bag.openbare_ruimte_naam ||
+      bag.huisnummer ||
+      bag.postcode ||
+      bag.woonplaats_naam
+    )
+  ) {
+
+    const parts = [
+
+      bag.openbare_ruimte_naam,
+
+      bag.huisnummer !== null &&
+      bag.huisnummer !== undefined
+        ? String(bag.huisnummer)
+        : undefined,
+
+      bag.huisletter,
+
+      bag.postcode,
+
+      bag.woonplaats_naam,
+
+    ].filter(Boolean);
+
+
+    if (parts.length > 0) {
+      return parts.join(" ");
+    }
+  }
+
+
+  return null;
 }
 
 
@@ -682,6 +885,22 @@ export default function VulnerableObjects({
             : false;
 
 
+        const phone =
+          getPhoneNumber(object);
+
+        const website =
+          getWebsite(object);
+
+        const address =
+          getAddress(object);
+
+        const bag =
+          object.bag;
+
+        const pand =
+          object.pand;
+
+
         return (
           <Marker
             key={object.id}
@@ -697,7 +916,9 @@ export default function VulnerableObjects({
               <div
                 style={{
                   color: "#111",
-                  minWidth: "180px",
+                  minWidth: "220px",
+                  maxWidth: "320px",
+                  lineHeight: 1.4,
                 }}
               >
 
@@ -716,6 +937,108 @@ export default function VulnerableObjects({
                 <span>
                   Afstand: {Math.round(distance)} meter
                 </span>
+
+
+                {address && (
+                  <>
+                    <br />
+                    <span>
+                      📍 {address}
+                    </span>
+                  </>
+                )}
+
+
+                {phone && (
+                  <>
+                    <br />
+                    <span>
+                      ☎️{" "}
+                      <a
+                        href={`tel:${phone}`}
+                        style={{
+                          color: "#1565c0",
+                        }}
+                      >
+                        {phone}
+                      </a>
+                    </span>
+                  </>
+                )}
+
+
+                {website && (
+                  <>
+                    <br />
+                    <span>
+                      🌐{" "}
+                      <a
+                        href={
+                          website.startsWith("http")
+                            ? website
+                            : `https://${website}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          color: "#1565c0",
+                        }}
+                      >
+                        Website
+                      </a>
+                    </span>
+                  </>
+                )}
+
+
+                {bag?.oppervlakte !== null &&
+                  bag?.oppervlakte !== undefined && (
+                    <>
+                      <br />
+                      <span>
+                        📐 Oppervlakte:{" "}
+                        {bag.oppervlakte} m²
+                      </span>
+                    </>
+                  )}
+
+
+                {pand?.bouwjaar !== null &&
+                  pand?.bouwjaar !== undefined && (
+                    <>
+                      <br />
+                      <span>
+                        🏗️ Bouwjaar:{" "}
+                        {pand.bouwjaar}
+                      </span>
+                    </>
+                  )}
+
+
+                {pand?.aantal_verblijfsobjecten !== null &&
+                  pand?.aantal_verblijfsobjecten !== undefined && (
+                    <>
+                      <br />
+                      <span>
+                        🏢 Verblijfsobjecten:{" "}
+                        {pand.aantal_verblijfsobjecten}
+                      </span>
+                    </>
+                  )}
+
+
+                {pand?.gebruiksdoel && (
+                  <>
+                    <br />
+                    <span>
+                      🏷️ Gebruiksdoel:{" "}
+                      {formatBAGUsePurpose(
+                        pand.gebruiksdoel
+                      )}
+                    </span>
+                  </>
+                )}
+
 
                 {inGasZone && (
                   <>

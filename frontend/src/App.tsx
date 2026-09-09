@@ -335,6 +335,205 @@ function objectTypeName(
 
 
 /* =========================================================
+   BAG GEBRUIKSDOEL
+   ========================================================= */
+
+function formatBAGUsePurpose(
+  value?: string | null
+): string {
+
+  if (!value) {
+    return "";
+  }
+
+  const labels: Record<string, string> = {
+
+    woonfunctie:
+      "Woonfunctie",
+
+    gezondheidszorgfunctie:
+      "Gezondheidszorgfunctie",
+
+    bijeenkomstfunctie:
+      "Bijeenkomstfunctie",
+
+    kantoorfunctie:
+      "Kantoorfunctie",
+
+    logiesfunctie:
+      "Logiesfunctie",
+
+    onderwijsfunctie:
+      "Onderwijsfunctie",
+
+    sportfunctie:
+      "Sportfunctie",
+
+    winkelfunctie:
+      "Winkelfunctie",
+
+    industriefunctie:
+      "Industriefunctie",
+
+    overige_gebruiksfunctie:
+      "Overige gebruiksfunctie",
+
+    celfunctie:
+      "Celfunctie",
+
+  };
+
+  return value
+    .split(",")
+    .map(
+      (item) =>
+        labels[item.trim()] ||
+        item.trim()
+    )
+    .join(", ");
+}
+
+
+/* =========================================================
+   TELEFOONNUMMER
+   ========================================================= */
+
+function getPhoneNumber(
+  object: VulnerableObject
+): string | null {
+
+  const tags =
+    object.tags;
+
+  if (!tags) {
+    return null;
+  }
+
+  const phone =
+    tags["contact:phone"] ||
+    tags.phone ||
+    tags["contact:mobile"] ||
+    tags.mobile;
+
+  return typeof phone === "string"
+    ? phone
+    : null;
+}
+
+
+/* =========================================================
+   WEBSITE
+   ========================================================= */
+
+function getWebsite(
+  object: VulnerableObject
+): string | null {
+
+  const tags =
+    object.tags;
+
+  if (!tags) {
+    return null;
+  }
+
+  const website =
+    tags["contact:website"] ||
+    tags.website;
+
+  return typeof website === "string"
+    ? website
+    : null;
+}
+
+
+/* =========================================================
+   ADRES
+   ========================================================= */
+
+function getObjectAddress(
+  object: VulnerableObject
+): string | null {
+
+  const address =
+    object.address;
+
+  if (
+    address &&
+    (
+      address.street ||
+      address.housenumber ||
+      address.postcode ||
+      address.city
+    )
+  ) {
+
+    const parts = [
+
+      address.street,
+
+      address.housenumber !== undefined
+        ? String(address.housenumber)
+        : undefined,
+
+      address.houseletter,
+
+      address.postcode,
+
+      address.city,
+
+    ].filter(Boolean);
+
+    if (parts.length > 0) {
+      return parts.join(" ");
+    }
+  }
+
+
+  /* -------------------------------------------------------
+     FALLBACK NAAR BAG
+     ------------------------------------------------------- */
+
+  const bag =
+    object.bag;
+
+  if (
+    bag &&
+    (
+      bag.openbare_ruimte_naam ||
+      bag.huisnummer ||
+      bag.postcode ||
+      bag.woonplaats_naam
+    )
+  ) {
+
+    const parts = [
+
+      bag.openbare_ruimte_naam,
+
+      bag.huisnummer !== null &&
+      bag.huisnummer !== undefined
+        ? String(bag.huisnummer)
+        : undefined,
+
+      bag.huisletter,
+
+      bag.postcode,
+
+      bag.woonplaats_naam,
+
+    ].filter(Boolean);
+
+    if (parts.length > 0) {
+      return parts.join(" ");
+    }
+  }
+
+
+  return null;
+}
+
+
+/* =========================================================
    SVG ICOON VOOR OBJECT
    Zelfde stijl als op de kaart
    ========================================================= */
@@ -930,6 +1129,21 @@ function App() {
 
 
   /* =======================================================
+     UITGEKLAPTE OBJECTEN
+
+     true = details zichtbaar
+     false = details verborgen
+
+     Standaard zijn alle objectdetails ingeklapt.
+     ======================================================= */
+
+  const [
+    expandedObjects,
+    setExpandedObjects
+  ] = useState<Record<string, boolean>>({});
+
+
+  /* =======================================================
      CATEGORIE OPEN / DICHT
      ======================================================= */
 
@@ -958,6 +1172,23 @@ function App() {
       (previous) => ({
         ...previous,
         [category]: !previous[category],
+      })
+    );
+  }
+
+
+  /* =======================================================
+     OBJECT DETAILS OPEN / DICHT
+     ======================================================= */
+
+  function toggleObjectDetails(
+    objectId: string
+  ) {
+
+    setExpandedObjects(
+      (previous) => ({
+        ...previous,
+        [objectId]: !previous[objectId],
       })
     );
   }
@@ -1082,6 +1313,8 @@ function App() {
     setObjects([]);
 
     setGasZone([]);
+
+    setExpandedObjects({});
 
     setObjectsLoading(true);
 
@@ -1634,49 +1867,292 @@ function App() {
                                 );
 
 
+                              const expanded =
+                                expandedObjects[object.id] === true;
+
+
+                              const phone =
+                                getPhoneNumber(object);
+
+
+                              const website =
+                                getWebsite(object);
+
+
+                              const address =
+                                getObjectAddress(object);
+
+
+                              const bag =
+                                object.bag;
+
+
+                              const pand =
+                                object.pand;
+
+
+                              const hasExtraInformation =
+                                Boolean(
+                                  address ||
+                                  phone ||
+                                  website ||
+                                  bag?.oppervlakte !== null &&
+                                  bag?.oppervlakte !== undefined ||
+                                  pand?.bouwjaar !== null &&
+                                  pand?.bouwjaar !== undefined ||
+                                  pand?.aantal_verblijfsobjecten !== null &&
+                                  pand?.aantal_verblijfsobjecten !== undefined ||
+                                  pand?.gebruiksdoel
+                                );
+
+
                               return (
 
                                 <div
                                   className="object-row"
                                   key={object.id}
+                                  style={{
+                                    display: "block",
+                                  }}
                                 >
 
                                   <div
-                                    className="object-icon"
-                                    dangerouslySetInnerHTML={{
-                                      __html:
-                                        iconForType(
-                                          object.type
-                                        )
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      width: "100%",
                                     }}
-                                  />
+                                  >
+
+                                    <div
+                                      className="object-icon"
+                                      dangerouslySetInnerHTML={{
+                                        __html:
+                                          iconForType(
+                                            object.type
+                                          )
+                                      }}
+                                    />
 
 
-                                  <div className="object-details">
+                                    <div className="object-details">
 
-                                    <div className="object-name">
-                                      {object.name}
-                                    </div>
+                                      <div className="object-name">
+                                        {object.name}
+                                      </div>
 
-                                    <div className="object-type">
-                                      {objectTypeName(
-                                        object.type
+                                      <div className="object-type">
+                                        {objectTypeName(
+                                          object.type
+                                        )}
+                                      </div>
+
+                                      {hasExtraInformation && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            toggleObjectDetails(
+                                              object.id
+                                            )
+                                          }
+                                          aria-expanded={expanded}
+                                          style={{
+                                            marginTop: "5px",
+                                            padding: "0",
+                                            border: "none",
+                                            background: "none",
+                                            color: "#1976d2",
+                                            cursor: "pointer",
+                                            fontSize: "12px",
+                                            fontWeight: 400,
+                                          }}
+                                        >
+                                          {expanded
+                                            ? "Minder informatie ▲"
+                                            : "Meer informatie ▼"
+                                          }
+                                        </button>
                                       )}
+
+                                    </div>
+
+
+                                    <div className="object-distance">
+
+                                      {distance < 1000
+                                        ? `${Math.round(distance)} m`
+                                        : `${(
+                                            distance / 1000
+                                          ).toFixed(1)} km`
+                                      }
+
                                     </div>
 
                                   </div>
 
 
-                                  <div className="object-distance">
+                                  {/* =================================
+                                      EXTRA INFORMATIE
+                                      ================================= */}
 
-                                    {distance < 1000
-                                      ? `${Math.round(distance)} m`
-                                      : `${(
-                                          distance / 1000
-                                        ).toFixed(1)} km`
-                                    }
+                                  {expanded && hasExtraInformation && (
 
-                                  </div>
+                                    <div
+                                      style={{
+                                        marginTop: "8px",
+                                        marginLeft: "42px",
+                                        marginRight: "8px",
+                                        padding: "10px 12px",
+                                        borderTop: "1px solid #e0e0e0",
+                                        background: "#f7f7f7",
+                                        borderRadius: "6px",
+                                        fontSize: "12px",
+                                        lineHeight: 1.5,
+                                        color: "#333",
+                                      }}
+                                    >
+
+                                      {address && (
+                                        <div
+                                          style={{
+                                            marginBottom: "4px",
+                                          }}
+                                        >
+                                          <strong>
+                                            Adres:
+                                          </strong>{" "}
+                                          {address}
+                                        </div>
+                                      )}
+
+
+                                      {phone && (
+                                        <div
+                                          style={{
+                                            marginBottom: "4px",
+                                          }}
+                                        >
+                                          <strong>
+                                            Telefoon:
+                                          </strong>{" "}
+                                          <a
+                                            href={`tel:${phone}`}
+                                            style={{
+                                              color: "#1565c0",
+                                              textDecoration: "none",
+                                            }}
+                                          >
+                                            {phone}
+                                          </a>
+                                        </div>
+                                      )}
+
+
+                                      {website && (
+                                        <div
+                                          style={{
+                                            marginBottom: "4px",
+                                          }}
+                                        >
+                                          <strong>
+                                            Website:
+                                          </strong>{" "}
+                                          <a
+                                            href={
+                                              website.startsWith("http")
+                                                ? website
+                                                : `https://${website}`
+                                            }
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{
+                                              color: "#1565c0",
+                                              textDecoration: "none",
+                                            }}
+                                          >
+                                            Website openen
+                                          </a>
+                                        </div>
+                                      )}
+
+
+                                      {bag?.oppervlakte !== null &&
+                                        bag?.oppervlakte !== undefined && (
+                                          <div
+                                            style={{
+                                              marginBottom: "4px",
+                                            }}
+                                          >
+                                            <strong>
+                                              Oppervlakte:
+                                            </strong>{" "}
+                                            {bag.oppervlakte} m²
+                                          </div>
+                                        )}
+
+
+                                      {pand?.bouwjaar !== null &&
+                                        pand?.bouwjaar !== undefined && (
+                                          <div
+                                            style={{
+                                              marginBottom: "4px",
+                                            }}
+                                          >
+                                            <strong>
+                                              Bouwjaar:
+                                            </strong>{" "}
+                                            {pand.bouwjaar}
+                                          </div>
+                                        )}
+
+
+                                      {pand?.aantal_verblijfsobjecten !== null &&
+                                        pand?.aantal_verblijfsobjecten !== undefined && (
+                                          <div
+                                            style={{
+                                              marginBottom: "4px",
+                                            }}
+                                          >
+                                            <strong>
+                                              Verblijfsobjecten:
+                                            </strong>{" "}
+                                            {pand.aantal_verblijfsobjecten}
+                                          </div>
+                                        )}
+
+
+                                      {pand?.gebruiksdoel && (
+                                        <div
+                                          style={{
+                                            marginBottom: "4px",
+                                          }}
+                                        >
+                                          <strong>
+                                            Gebruiksdoel:
+                                          </strong>{" "}
+                                          {formatBAGUsePurpose(
+                                            pand.gebruiksdoel
+                                          )}
+                                        </div>
+                                      )}
+
+
+                                      {bag?.status && (
+                                        <div
+                                          style={{
+                                            marginBottom: "4px",
+                                          }}
+                                        >
+                                          <strong>
+                                            BAG-status:
+                                          </strong>{" "}
+                                          {bag.status}
+                                        </div>
+                                      )}
+
+                                    </div>
+
+                                  )}
 
                                 </div>
 

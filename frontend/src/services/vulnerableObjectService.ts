@@ -1,9 +1,71 @@
+export interface VulnerableObjectAddress {
+  street?: string;
+  housenumber?: string | number;
+  houseletter?: string | null;
+  postcode?: string;
+  city?: string;
+}
+
+
+export interface VulnerableObjectTags {
+  phone?: string;
+  "contact:phone"?: string;
+  mobile?: string;
+  "contact:mobile"?: string;
+  website?: string;
+  "contact:website"?: string;
+  [key: string]: unknown;
+}
+
+
+export interface VulnerableObjectBAG {
+  bronhouder_identificatie?: string | null;
+  bronhouder_naam?: string | null;
+  identificatie?: string | null;
+  openbare_ruimte_naam?: string | null;
+  huisnummer?: number | null;
+  huisletter?: string | null;
+  postcode?: string | null;
+  woonplaats_naam?: string | null;
+  oppervlakte?: number | null;
+  gebruiksdoel?: string | null;
+  status?: string | null;
+  verblijfsobject_id?: string | null;
+  [key: string]: unknown;
+}
+
+
+export interface VulnerableObjectPand {
+  identificatie?: string | null;
+  bouwjaar?: number | null;
+  aantal_verblijfsobjecten?: number | null;
+  gebruiksdoel?: string | null;
+  status?: string | null;
+}
+
+
 export interface VulnerableObject {
   id: string;
   name: string;
   type: string;
   latitude: number;
   longitude: number;
+
+  distance?: number;
+
+  address?: VulnerableObjectAddress;
+
+  tags?: VulnerableObjectTags;
+
+  bag?: VulnerableObjectBAG;
+
+  pand?: VulnerableObjectPand;
+
+  source?: string;
+
+  confidence?: string;
+
+  priority?: number;
 }
 
 
