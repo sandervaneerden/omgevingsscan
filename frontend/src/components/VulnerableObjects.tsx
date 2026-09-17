@@ -211,15 +211,25 @@ function labelForType(
     case "community_centre":
       return "Buurt- / wijkcentrum";
 
+    case "social_facility":
+      return "Maatschappelijke voorziening";
+
+
+    /* =====================================================
+       SPORT
+       ===================================================== */
+
+    case "sport":
+    case "sports":
+    case "sports_centre":
+    case "sports_hall":
+    case "sports_ground":
+    case "stadium":
+      return "Sportvoorziening";
+
 
     case "hotel":
       return "Hotel";
-
-
-    case "sport":
-    case "sports_centre":
-    case "stadium":
-      return "Sportvoorziening";
 
 
     case "marketplace":
@@ -715,6 +725,8 @@ function iconForType(type: string) {
 
     case "community":
     case "community_centre":
+    case "social_facility":
+
 
       icon = `
         <svg
@@ -742,6 +754,74 @@ function iconForType(type: string) {
             width="5"
             height="6"
             fill="white"
+          />
+
+        </svg>
+      `;
+
+      break;
+
+
+    /* =====================================================
+       SPORT
+       ===================================================== */
+
+    case "sport":
+    case "sports":
+    case "sports_centre":
+    case "sports_hall":
+    case "sports_ground":
+    case "stadium":
+
+      icon = `
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+        >
+
+          <circle
+            cx="16"
+            cy="16"
+            r="13"
+            fill="#388e3c"
+          />
+
+          <path
+            d="M10 11L16 8L22 11L24 17L20 23H12L8 17L10 11Z"
+            fill="none"
+            stroke="white"
+            stroke-width="2"
+          />
+
+          <path
+            d="M16 8V14"
+            stroke="white"
+            stroke-width="2"
+          />
+
+          <path
+            d="M8 17L14 16"
+            stroke="white"
+            stroke-width="2"
+          />
+
+          <path
+            d="M24 17L18 16"
+            stroke="white"
+            stroke-width="2"
+          />
+
+          <path
+            d="M12 23L14 18"
+            stroke="white"
+            stroke-width="2"
+          />
+
+          <path
+            d="M20 23L18 18"
+            stroke="white"
+            stroke-width="2"
           />
 
         </svg>
