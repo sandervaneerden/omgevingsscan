@@ -254,6 +254,11 @@ function detectCareTypeFromText(text) {
     return "home_care";
   }
 
+  /*
+   * Huisartsen worden nog wel herkend als
+   * "doctor", maar worden later bewust
+   * uitgesloten uit de resultaten.
+   */
   if (
     /\bhuisarts\b/.test(normalized) ||
     /\bhuisartsen\b/.test(normalized) ||
@@ -469,6 +474,12 @@ function getObjectType(tags = {}) {
     return "clinic";
   }
 
+  /*
+   * Huisarts / huisartspraktijk.
+   *
+   * Deze wordt bewust als doctor herkend,
+   * maar later definitief uitgesloten.
+   */
   if (
     tags.healthcare === "doctor" ||
     tags.healthcare ===
@@ -604,9 +615,6 @@ function priorityForType(type) {
     case "rehabilitation":
       return 2;
 
-    case "doctor":
-      return 3;
-
     case "school":
     case "daycare":
       return 4;
@@ -640,7 +648,6 @@ function isReturnedVulnerableType(
     "hospice",
     "mental_health",
     "rehabilitation",
-    "doctor",
     "school",
     "daycare",
     "place_of_worship",
@@ -1215,14 +1222,30 @@ function processOSMObjects(
 
     /*
      * Niet tonen.
+     *
+     * Gewone huisartsen worden bewust
+     * uitgesloten van de omgevingsscan.
+     *
+     * Tandartsen, fysiotherapie en apotheken
+     * worden eveneens niet getoond.
      */
     if (
       [
+        "doctor",
         "dentist",
         "physiotherapy",
         "pharmacy",
       ].includes(type)
     ) {
+      console.log(
+        `OSM uitgesloten: ${
+          tags.name ||
+          tags.official_name ||
+          tags.alt_name ||
+          "Onbekend object"
+        } (${type})`
+      );
+
       continue;
     }
 
@@ -2586,7 +2609,7 @@ app.get(
             b.priority
           ) {
             return (
-              a.priority -
+              a.priority - 
               b.priority
             );
           }
