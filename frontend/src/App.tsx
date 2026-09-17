@@ -189,6 +189,13 @@ function categoryForType(
     case "community":
     case "community_centre":
     case "social_facility":
+
+    case "sport":
+    case "sports":
+    case "sports_centre":
+    case "sports_hall":
+    case "sports_ground":
+    case "stadium":
       return "Maatschappelijk";
 
     case "hotel":
@@ -321,6 +328,14 @@ function objectTypeName(
     case "social_facility":
       return "Maatschappelijke voorziening";
 
+    case "sport":
+    case "sports":
+    case "sports_centre":
+    case "sports_hall":
+    case "sports_ground":
+    case "stadium":
+      return "Sportvoorziening";
+
     case "hotel":
       return "Hotel";
 
@@ -382,7 +397,6 @@ function formatBAGUsePurpose(
 
     celfunctie:
       "Celfunctie",
-
   };
 
   return value
@@ -491,10 +505,6 @@ function getObjectAddress(
   }
 
 
-  /* -------------------------------------------------------
-     FALLBACK NAAR BAG
-     ------------------------------------------------------- */
-
   const bag =
     object.bag;
 
@@ -530,14 +540,12 @@ function getObjectAddress(
     }
   }
 
-
   return null;
 }
 
 
 /* =========================================================
    SVG ICOON VOOR OBJECT
-   Zelfde stijl als op de kaart
    ========================================================= */
 
 function iconForType(
@@ -841,6 +849,13 @@ function iconForType(
     case "community_centre":
     case "social_facility":
 
+    case "sport":
+    case "sports":
+    case "sports_centre":
+    case "sports_hall":
+    case "sports_ground":
+    case "stadium":
+
       return `
         <svg
           viewBox="0 0 32 32"
@@ -999,10 +1014,6 @@ const categoryOrder: Category[] = [
 
 function App() {
 
-  /* =======================================================
-     LOCATIE
-     ======================================================= */
-
   const [
     location,
     setLocation
@@ -1013,19 +1024,11 @@ function App() {
   });
 
 
-  /* =======================================================
-     WEER
-     ======================================================= */
-
   const [
     weather,
     setWeather
   ] = useState<WeatherResult | null>(null);
 
-
-  /* =======================================================
-     OBJECTEN
-     ======================================================= */
 
   const [
     objects,
@@ -1039,24 +1042,11 @@ function App() {
   ] = useState(false);
 
 
-  /* =======================================================
-     GASZONE
-     ======================================================= */
-
   const [
     gasZone,
     setGasZone
   ] = useState<[number, number][]>([]);
 
-
-  /* =======================================================
-     INGEKLAPTE CATEGORIEËN
-
-     true = ingeklapt
-     false = open
-
-     Standaard staan alle categorieën ingeklapt.
-     ======================================================= */
 
   const [
     collapsedCategories,
@@ -1072,15 +1062,6 @@ function App() {
   });
 
 
-  /* =======================================================
-     FILTER CATEGORIEËN
-
-     true = zichtbaar
-     false = verborgen
-
-     Standaard staan alle categorieën aan.
-     ======================================================= */
-
   const [
     enabledCategories,
     setEnabledCategories
@@ -1095,29 +1076,17 @@ function App() {
   });
 
 
-  /* =======================================================
-     UITGEKLAPTE OBJECTEN
-     ======================================================= */
-
   const [
     expandedObjects,
     setExpandedObjects
   ] = useState<Record<string, boolean>>({});
 
 
-  /* =======================================================
-     KOPIEERSTATUS OBJECTEN
-     ======================================================= */
-
   const [
     objectsCopied,
     setObjectsCopied
   ] = useState(false);
 
-
-  /* =======================================================
-     CATEGORIE OPEN / DICHT
-     ======================================================= */
 
   function toggleCategory(
     category: Category
@@ -1132,10 +1101,6 @@ function App() {
   }
 
 
-  /* =======================================================
-     CATEGORIE ZICHTBAAR / ONZICHTBAAR
-     ======================================================= */
-
   function toggleCategoryVisibility(
     category: Category
   ) {
@@ -1148,10 +1113,6 @@ function App() {
     );
   }
 
-
-  /* =======================================================
-     OBJECT DETAILS OPEN / DICHT
-     ======================================================= */
 
   function toggleObjectDetails(
     objectId: string
@@ -1166,17 +1127,9 @@ function App() {
   }
 
 
-  /* =======================================================
-     AANVRAAG-ID
-     ======================================================= */
-
   const requestIdRef =
     useRef(0);
 
-
-  /* =======================================================
-     OBJECTEN OPHALEN
-     ======================================================= */
 
   async function loadObjects(
     latitude: number,
@@ -1247,10 +1200,6 @@ function App() {
   }
 
 
-  /* =======================================================
-     LOCATIE GEVONDEN
-     ======================================================= */
-
   async function handleLocationFound(
     locationData: {
       address: string;
@@ -1275,27 +1224,13 @@ function App() {
 
     setLocation(locationData);
 
-
-    /* -----------------------------------------------------
-       OUDE DATA WISSEN
-       ----------------------------------------------------- */
-
     setWeather(null);
-
     setObjects([]);
-
     setGasZone([]);
-
     setExpandedObjects({});
-
     setObjectsCopied(false);
-
     setObjectsLoading(true);
 
-
-    /* -----------------------------------------------------
-       WEER
-       ----------------------------------------------------- */
 
     try {
 
@@ -1334,10 +1269,6 @@ function App() {
     }
 
 
-    /* -----------------------------------------------------
-       OBJECTEN
-       ----------------------------------------------------- */
-
     await loadObjects(
       locationData.latitude,
       locationData.longitude,
@@ -1345,10 +1276,6 @@ function App() {
     );
   }
 
-
-  /* =========================================================
-     OBJECTEN FILTEREN OP 500 METER + GASZONE
-     ========================================================= */
 
   const spatiallyVisibleObjects =
     objects.filter(
@@ -1359,10 +1286,6 @@ function App() {
             .trim()
             .toLowerCase();
 
-
-        /* ---------------------------------------------------
-           NAAMLOZE WINKELCENTRA UITSLUITEN
-           --------------------------------------------------- */
 
         if (
           (
@@ -1380,10 +1303,6 @@ function App() {
         }
 
 
-        /* ---------------------------------------------------
-           AFSTAND
-           --------------------------------------------------- */
-
         const distance =
           distanceInMeters(
             location.latitude,
@@ -1393,10 +1312,6 @@ function App() {
           );
 
 
-        /* ---------------------------------------------------
-           500 METER
-           --------------------------------------------------- */
-
         if (
           distance <= OBJECT_CIRCLE_RADIUS
         ) {
@@ -1404,10 +1319,6 @@ function App() {
           return true;
         }
 
-
-        /* ---------------------------------------------------
-           GASZONE NOG NIET BESCHIKBAAR
-           --------------------------------------------------- */
 
         if (
           gasZone.length < 3
@@ -1417,10 +1328,6 @@ function App() {
         }
 
 
-        /* ---------------------------------------------------
-           GASZONE
-           --------------------------------------------------- */
-
         return pointInPolygon(
           object.latitude,
           object.longitude,
@@ -1429,10 +1336,6 @@ function App() {
       }
     );
 
-
-  /* =========================================================
-     CATEGORIE FILTER
-     ========================================================= */
 
   const visibleObjects =
     spatiallyVisibleObjects.filter(
@@ -1447,10 +1350,6 @@ function App() {
       }
     );
 
-
-  /* =========================================================
-     OBJECTEN GROEPEREN
-     ========================================================= */
 
   const groupedObjects =
     visibleObjects.reduce(
@@ -1480,17 +1379,9 @@ function App() {
     );
 
 
-  /* =========================================================
-     TOTAAL
-     ========================================================= */
-
   const totalVisibleObjects =
     visibleObjects.length;
 
-
-  /* =========================================================
-     OBJECTEN KOPIËREN
-     ========================================================= */
 
   async function copyObjects() {
 
@@ -1742,16 +1633,8 @@ function App() {
   }
 
 
-  /* =========================================================
-     RENDER
-     ========================================================= */
-
   return (
     <div className="app">
-
-      {/* ===================================================
-          HEADER
-          =================================================== */}
 
       <header className="header">
 
@@ -1796,10 +1679,6 @@ function App() {
       </header>
 
 
-      {/* ===================================================
-          ZOEKPANEEL
-          =================================================== */}
-
       <section className="search-panel">
 
         <h2>
@@ -1812,10 +1691,6 @@ function App() {
           }
         />
 
-
-        {/* =================================================
-            CATEGORIEFILTER
-            ================================================= */}
 
         <div
           className="category-filter-bar"
@@ -1892,16 +1767,8 @@ function App() {
       </section>
 
 
-      {/* ===================================================
-          DASHBOARD
-          =================================================== */}
-
       <main className="dashboard">
 
-
-        {/* =================================================
-            WEER
-            ================================================= */}
 
         <section className="panel weather-panel">
 
@@ -2017,10 +1884,6 @@ function App() {
 
         </section>
 
-
-        {/* =================================================
-            OBJECTEN
-            ================================================= */}
 
         <section className="panel objects-panel">
 
@@ -2530,10 +2393,6 @@ function App() {
 
         </section>
 
-
-        {/* =================================================
-            KAART
-            ================================================= */}
 
         <section className="panel map-panel">
 
