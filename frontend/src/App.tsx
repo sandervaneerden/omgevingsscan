@@ -158,6 +158,7 @@ function categoryForType(
     case "psychologist":
     case "mental_health":
     case "disabled_care":
+    case "disability_care":
     case "protected_living":
     case "hospice":
     case "rehabilitation":
@@ -251,6 +252,7 @@ function objectTypeName(
       return "Geestelijke gezondheidszorg";
 
     case "disabled_care":
+    case "disability_care":
       return "Gehandicaptenzorg";
 
     case "protected_living":
@@ -588,6 +590,7 @@ function iconForType(
     case "residential_care":
     case "mental_health":
     case "disabled_care":
+    case "disability_care":
     case "protected_living":
     case "hospice":
     case "rehabilitation":
