@@ -31,25 +31,28 @@ const DUO_SCHOOLS_PATH = path.join(
   "duo-schools.json"
 );
 
-/*
- * Actuele PDOK BAG OGC API.
- */
+// 🟨 GEWIJZIGD: LRK-bestand toegevoegd
+const LRK_CHILDCARE_PATH = path.join(
+  __dirname,
+  "data",
+  "lrk-childcare.json"
+);
+
 const BAG_BASE_URL =
   "https://api.pdok.nl/kadaster/bag/ogc/v2";
 
-/*
- * DUO-scholen worden bij het starten één keer
- * ingelezen.
- */
+/* =========================================================
+   DUO
+========================================================= */
+
 let duoSchools = [];
 
 try {
   if (fs.existsSync(DUO_SCHOOLS_PATH)) {
-    const raw =
-      fs.readFileSync(
-        DUO_SCHOOLS_PATH,
-        "utf8"
-      );
+    const raw = fs.readFileSync(
+      DUO_SCHOOLS_PATH,
+      "utf8"
+    );
 
     duoSchools = JSON.parse(raw);
 
@@ -57,7 +60,6 @@ try {
       console.error(
         "DUO-bestand bevat geen array."
       );
-
       duoSchools = [];
     } else {
       console.log(
@@ -79,6 +81,48 @@ try {
 }
 
 /* =========================================================
+   LRK
+========================================================= */
+
+// 🟨 GEWIJZIGD: LRK kinderopvang laden
+
+let lrkChildcare = [];
+
+try {
+  if (fs.existsSync(LRK_CHILDCARE_PATH)) {
+    const raw = fs.readFileSync(
+      LRK_CHILDCARE_PATH,
+      "utf8"
+    );
+
+    lrkChildcare = JSON.parse(raw);
+
+    if (!Array.isArray(lrkChildcare)) {
+      console.error(
+        "LRK-bestand bevat geen array."
+      );
+
+      lrkChildcare = [];
+    } else {
+      console.log(
+        `LRK-kinderopvang geladen: ${lrkChildcare.length}`
+      );
+    }
+  } else {
+    console.warn(
+      `LRK-bestand niet gevonden: ${LRK_CHILDCARE_PATH}`
+    );
+  }
+} catch (error) {
+  console.error(
+    "Fout bij laden LRK-kinderopvang:",
+    error.message
+  );
+
+  lrkChildcare = [];
+}
+
+/* =========================================================
    CACHE
 ========================================================= */
 
@@ -88,6 +132,20 @@ const bagPandPromiseCache = new Map();
 /* =========================================================
    ALGEMENE HELPERS
 ========================================================= */
+
+function firstDefined(...values) {
+  for (const value of values) {
+    if (
+      value !== undefined &&
+      value !== null &&
+      value !== ""
+    ) {
+      return value;
+    }
+  }
+
+  return null;
+}
 
 function normalizeText(value) {
   return String(value || "")
@@ -110,6 +168,50 @@ function normalizeHouseNumber(value) {
     .toLowerCase()
     .replace(/\s+/g, "")
     .trim();
+}
+
+function normalizePostcode(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+/*
+ * BAG-identificaties kunnen als:
+ *
+ * 1895100000006952
+ *
+ * of bijvoorbeeld als URI worden aangeleverd.
+ *
+ * Daarom vergelijken we altijd de laatste
+ * betekenisvolle ID-component.
+ */
+
+function normalizeBAGId(value) {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  let result = String(value).trim();
+
+  if (!result) {
+    return null;
+  }
+
+  result = result.replace(/[?#].*$/, "");
+  result = result.replace(/\/+$/, "");
+
+  if (result.includes("/")) {
+    const parts = result.split("/");
+    result = parts[parts.length - 1];
+  }
+
+  return result || null;
 }
 
 function distanceMeters(
@@ -185,10 +287,6 @@ function detectCareTypeFromText(text) {
   const normalized =
     normalizeText(text);
 
-  /*
-   * Specifieke kwetsbare zorg eerst.
-   */
-
   if (
     /\bverpleeghuis\b/.test(normalized) ||
     /\bverzorgingshuis\b/.test(normalized) ||
@@ -254,11 +352,6 @@ function detectCareTypeFromText(text) {
     return "home_care";
   }
 
-  /*
-   * Huisartsen worden nog wel herkend als
-   * "doctor", maar worden later bewust
-   * uitgesloten uit de resultaten.
-   */
   if (
     /\bhuisarts\b/.test(normalized) ||
     /\bhuisartsen\b/.test(normalized) ||
@@ -273,7 +366,8 @@ function detectCareTypeFromText(text) {
     /\bkinderopvang\b/.test(normalized) ||
     /\bpeuterspeelzaal\b/.test(normalized) ||
     /\bkindcentrum\b/.test(normalized) ||
-    /\bkinderdagcentrum\b/.test(normalized)
+    /\bkinderdagcentrum\b/.test(normalized) ||
+    /\bbso\b/.test(normalized)
   ) {
     return "daycare";
   }
@@ -291,10 +385,6 @@ function detectCareTypeFromText(text) {
   ) {
     return "clinic";
   }
-
-  /*
-   * Deze typen herkennen we wel maar tonen we niet.
-   */
 
   if (
     /\btandarts\b/.test(normalized) ||
@@ -343,20 +433,12 @@ function getObjectType(tags = {}) {
   const name =
     normalizeText(tags.name);
 
-  /*
-   * Specifieke organisaties.
-   */
-
   if (
     name === "jonx" ||
     name.includes("dignis")
   ) {
     return "disability_care";
   }
-
-  /* -------------------------
-     SOCIAL FACILITY
-  ------------------------- */
 
   if (
     tags.amenity ===
@@ -375,82 +457,45 @@ function getObjectType(tags = {}) {
       );
 
     if (
-      facility.includes(
-        "nursing_home"
-      ) ||
-      facility.includes(
-        "nursing home"
-      ) ||
-      facility.includes(
-        "verpleeghuis"
-      ) ||
-      facility.includes(
-        "verzorgingshuis"
-      ) ||
-      facility.includes(
-        "woonzorg"
-      ) ||
-      facility.includes(
-        "assisted_living"
-      ) ||
-      facility.includes(
-        "groep_wonen"
-      ) ||
-      facility.includes(
-        "group_home"
-      )
+      facility.includes("nursing_home") ||
+      facility.includes("nursing home") ||
+      facility.includes("verpleeghuis") ||
+      facility.includes("verzorgingshuis") ||
+      facility.includes("woonzorg") ||
+      facility.includes("assisted_living") ||
+      facility.includes("groep_wonen") ||
+      facility.includes("group_home")
     ) {
       return "nursing_home";
     }
 
     if (
-      facility.includes(
-        "disability"
-      ) ||
-      facility.includes(
-        "gehandicap"
-      ) ||
-      facility.includes(
-        "woonbegeleiding"
-      )
+      facility.includes("disability") ||
+      facility.includes("gehandicap") ||
+      facility.includes("woonbegeleiding")
     ) {
       return "disability_care";
     }
 
     if (
-      facility.includes(
-        "hospice"
-      ) ||
-      facility.includes(
-        "palliative"
-      )
+      facility.includes("hospice") ||
+      facility.includes("palliative")
     ) {
       return "hospice";
     }
 
     if (
-      facility.includes(
-        "mental_health"
-      ) ||
+      facility.includes("mental_health") ||
       facility.includes("ggz")
     ) {
       return "mental_health";
     }
 
-    /*
-     * Algemene social_facility
-     * niet automatisch als zorg.
-     */
     return null;
   }
 
-  /* -------------------------
-     HEALTHCARE
-  ------------------------- */
-
   if (
-    tags.healthcare ===
-    "hospital"
+    tags.healthcare === "hospital"
   ) {
     return "hospital";
   }
@@ -462,8 +507,7 @@ function getObjectType(tags = {}) {
   }
 
   if (
-    tags.healthcare ===
-    "clinic"
+    tags.healthcare === "clinic"
   ) {
     return "clinic";
   }
@@ -474,12 +518,6 @@ function getObjectType(tags = {}) {
     return "clinic";
   }
 
-  /*
-   * Huisarts / huisartspraktijk.
-   *
-   * Deze wordt bewust als doctor herkend,
-   * maar later definitief uitgesloten.
-   */
   if (
     tags.healthcare === "doctor" ||
     tags.healthcare ===
@@ -512,15 +550,6 @@ function getObjectType(tags = {}) {
     return "pharmacy";
   }
 
-  /*
-   * Generieke healthcare-tags
-   * worden niet automatisch zorg.
-   */
-
-  /* -------------------------
-     ONDERWIJS
-  ------------------------- */
-
   if (
     tags.amenity === "school"
   ) {
@@ -528,17 +557,11 @@ function getObjectType(tags = {}) {
   }
 
   if (
-    tags.amenity ===
-      "kindergarten" ||
-    tags.amenity ===
-      "childcare"
+    tags.amenity === "kindergarten" ||
+    tags.amenity === "childcare"
   ) {
     return "daycare";
   }
-
-  /* -------------------------
-     RELIGIE
-  ------------------------- */
 
   if (
     tags.amenity ===
@@ -547,20 +570,12 @@ function getObjectType(tags = {}) {
     return "place_of_worship";
   }
 
-  /* -------------------------
-     MAATSCHAPPELIJK
-  ------------------------- */
-
   if (
     tags.amenity ===
     "community_centre"
   ) {
     return "community_centre";
   }
-
-  /* -------------------------
-     SPORT
-  ------------------------- */
 
   if (
     tags.leisure ===
@@ -570,22 +585,13 @@ function getObjectType(tags = {}) {
     return "sports";
   }
 
-  /* -------------------------
-     LOGIES
-  ------------------------- */
-
   if (
     tags.tourism === "hotel" ||
     tags.tourism === "hostel" ||
-    tags.tourism ===
-      "guest_house"
+    tags.tourism === "guest_house"
   ) {
     return "hotel";
   }
-
-  /* -------------------------
-     WINKELS
-  ------------------------- */
 
   if (
     tags.shop === "supermarket"
@@ -638,9 +644,7 @@ function priorityForType(type) {
   }
 }
 
-function isReturnedVulnerableType(
-  type
-) {
+function isReturnedVulnerableType(type) {
   return [
     "hospital",
     "nursing_home",
@@ -660,7 +664,7 @@ function isReturnedVulnerableType(
 }
 
 /* =========================================================
-   ADRES HELPERS
+   ADRES
 ========================================================= */
 
 function namesMatch(
@@ -708,12 +712,33 @@ function addressesMatch(
       addressB.housenumber
     );
 
+  const postcodeA =
+    normalizePostcode(
+      addressA.postcode
+    );
+
+  const postcodeB =
+    normalizePostcode(
+      addressB.postcode
+    );
+
   if (
     streetA &&
     streetB &&
     houseA &&
     houseB &&
     streetA === streetB &&
+    houseA === houseB
+  ) {
+    return true;
+  }
+
+  if (
+    postcodeA &&
+    postcodeB &&
+    houseA &&
+    houseB &&
+    postcodeA === postcodeB &&
     houseA === houseB
   ) {
     return true;
@@ -936,7 +961,6 @@ async function queryOneOverpassServer(
     )
       ? json.elements
       : [];
-
   } finally {
     clearTimeout(timeout);
   }
@@ -996,7 +1020,6 @@ async function queryOverpassGet(
     )
       ? json.elements
       : [];
-
   } finally {
     clearTimeout(timeout);
   }
@@ -1007,61 +1030,34 @@ async function queryOverpass(
   longitude,
   radius
 ) {
-  /*
-   * Iets ruimer zoeken en daarna
-   * lokaal exact filteren.
-   */
   const searchRadius =
     Math.max(
       Number(radius) || 500,
       700
     );
 
-  /*
-   * We halen alleen categorieën op die
-   * daadwerkelijk door onze classificatie
-   * gebruikt worden.
-   *
-   * Geen aparte dentist/fysio/pharmacy
-   * queries meer.
-   */
   const query = `
 [out:json][timeout:25];
 (
   nwr(around:${searchRadius},${latitude},${longitude})["amenity"="social_facility"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["healthcare"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["amenity"="hospital"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["amenity"="clinic"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["amenity"="doctors"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["amenity"="school"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["amenity"="kindergarten"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["amenity"="childcare"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["amenity"="place_of_worship"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["amenity"="community_centre"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["leisure"="sports_centre"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["leisure"="stadium"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["tourism"="hotel"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["tourism"="hostel"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["tourism"="guest_house"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["shop"="supermarket"];
-
   nwr(around:${searchRadius},${latitude},${longitude})["amenity"="marketplace"];
 );
+
 out center tags;
 `;
 
@@ -1097,16 +1093,11 @@ out center tags;
       );
 
       return elements;
-
     } catch (error) {
       console.warn(
         `Overpass POST fout ${server}: ${error.message}`
       );
 
-      /*
-       * GET fallback voor servers
-       * die POST weigeren.
-       */
       if (
         error.message.includes(
           "HTTP 406"
@@ -1135,7 +1126,6 @@ out center tags;
           );
 
           return elements;
-
         } catch (getError) {
           console.warn(
             `Overpass GET fout ${server}: ${getError.message}`
@@ -1143,9 +1133,6 @@ out center tags;
         }
       }
 
-      /*
-       * Rate limiting.
-       */
       if (
         error.message.includes(
           "HTTP 429"
@@ -1220,15 +1207,6 @@ function processOSMObjects(
       continue;
     }
 
-    /*
-     * Niet tonen.
-     *
-     * Gewone huisartsen worden bewust
-     * uitgesloten van de omgevingsscan.
-     *
-     * Tandartsen, fysiotherapie en apotheken
-     * worden eveneens niet getoond.
-     */
     if (
       [
         "doctor",
@@ -1334,13 +1312,18 @@ async function queryBAG(
   const latDelta =
     radius / 111320;
 
+  const cosLat =
+    Math.cos(
+      (latitude * Math.PI) / 180
+    );
+
   const lonDelta =
     radius /
     (
       111320 *
-      Math.cos(
-        (latitude * Math.PI) /
-          180
+      Math.max(
+        Math.abs(cosLat),
+        0.01
       )
     );
 
@@ -1356,15 +1339,12 @@ async function queryBAG(
   const maxLat =
     latitude + latDelta;
 
-  /*
-   * Actuele PDOK BAG OGC API v2.
-   */
   let url =
     `${BAG_BASE_URL}/collections/` +
     `verblijfsobject/items` +
     `?bbox=${minLon},${minLat},${maxLon},${maxLat}` +
     "&limit=1000" +
-    "&f=geojson";
+    "&f=json";
 
   const results = [];
 
@@ -1427,9 +1407,6 @@ async function queryBAG(
           );
         }
 
-        /*
-         * Volgende pagina.
-         */
         const nextLink =
           Array.isArray(
             data.links
@@ -1451,7 +1428,6 @@ async function queryBAG(
 
         url =
           nextLink.href;
-
       } finally {
         clearTimeout(timeout);
       }
@@ -1514,34 +1490,75 @@ function getBAGType(
     return "shop";
   }
 
-  /*
-   * Gezondheidszorgfunctie uit BAG
-   * wordt bewust niet automatisch zorg.
-   *
-   * Daarvoor is BAG te algemeen.
-   */
-
   return null;
+}
+
+/* =========================================================
+   BAG IDENTIFICATIES
+========================================================= */
+
+function getBAGVerblijfsobjectId(
+  feature
+) {
+  const properties =
+    feature?.properties || {};
+
+  const value =
+    firstDefined(
+      properties.identificatie,
+      properties.verblijfsobjectidentificatie,
+      properties.verblijfsobject_identificatie,
+      properties.verblijfsobject_id,
+      properties.verblijfsobjectId,
+      properties[
+        "verblijfsobject:identificatie"
+      ],
+      properties.id,
+      feature?.id
+    );
+
+  return normalizeBAGId(
+    value
+  );
+}
+
+function getBAGPandId(
+  feature
+) {
+  const properties =
+    feature?.properties || {};
+
+  const value =
+    firstDefined(
+      properties.pand_id,
+      properties.pandidentificatie,
+      properties.pand_identificatie,
+      properties[
+        "pand:identificatie"
+      ],
+      properties.pandId
+    );
+
+  return normalizeBAGId(
+    value
+  );
 }
 
 function getBAGPandHref(
   feature
 ) {
   const properties =
-    feature.properties || {};
+    feature?.properties || {};
 
   const pand =
-    properties.pand ||
-    properties.pand_href ||
-    properties[
-      "pand:href"
-    ] ||
-    null;
+    firstDefined(
+      properties.pand,
+      properties.pand_href,
+      properties[
+        "pand:href"
+      ]
+    );
 
-  /*
-   * Nieuwe BAG API geeft pand
-   * als array met relaties terug.
-   */
   if (
     Array.isArray(pand)
   ) {
@@ -1551,61 +1568,62 @@ function getBAGPandHref(
       return null;
     }
 
-    const first =
-      pand[0];
-
-    if (
-      typeof first ===
-      "string"
+    for (
+      const item of pand
     ) {
-      return first;
-    }
+      if (
+        typeof item ===
+        "string"
+      ) {
+        return item;
+      }
 
-    if (
-      first &&
-      typeof first ===
-        "object"
-    ) {
-      return (
-        first.href ||
-        first["@id"] ||
-        first.id ||
-        null
-      );
+      if (
+        item &&
+        typeof item ===
+          "object"
+      ) {
+        const href =
+          firstDefined(
+            item.href,
+            item["@id"],
+            item.id
+          );
+
+        if (href) {
+          return href;
+        }
+      }
     }
 
     return null;
   }
 
   if (
+    pand &&
     typeof pand ===
-    "object"
+      "object"
   ) {
-    return (
-      pand.href ||
-      pand["@id"] ||
-      pand.id ||
-      null
+    return firstDefined(
+      pand.href,
+      pand["@id"],
+      pand.id
     );
   }
 
-  return pand;
+  if (
+    typeof pand ===
+    "string"
+  ) {
+    return pand;
+  }
+
+  return null;
 }
 
-function getBAGPandId(
-  feature
-) {
-  const properties =
-    feature.properties || {};
-
-  return (
-    properties.pand_id ||
-    properties[
-      "pand:identificatie"
-    ] ||
-    null
-  );
-}
+/* =========================================================
+   BAG PAND GEGEVENS
+========================================================= */
 
 async function queryBAGPand(
   href
@@ -1641,7 +1659,7 @@ async function queryBAGPand(
         setTimeout(
           () =>
             controller.abort(),
-          8000
+          10000
         );
 
       try {
@@ -1665,6 +1683,10 @@ async function queryBAGPand(
           );
 
         if (!response.ok) {
+          console.warn(
+            `BAG pand HTTP ${response.status}: ${href}`
+          );
+
           return null;
         }
 
@@ -1674,26 +1696,67 @@ async function queryBAGPand(
         const properties =
           data.properties || {};
 
+        const aantalVerblijfsobjecten =
+          firstDefined(
+            properties.aantal_verblijfsobjecten,
+            properties.aantalVerblijfsobjecten
+          );
+
+        const oppervlakte =
+          firstDefined(
+            properties.oppervlakte,
+            properties.oppervlakte_verblijfsobject
+          );
+
+        const identificatie =
+          firstDefined(
+            properties.identificatie,
+            properties.pandidentificatie,
+            properties.pand_identificatie,
+            properties.id
+          );
+
         const result = {
           identificatie:
-            properties.identificatie ||
-            null,
+            normalizeBAGId(
+              identificatie
+            ),
 
           bouwjaar:
-            properties.bouwjaar ||
-            null,
+            firstDefined(
+              properties.bouwjaar
+            ),
+
+          aantal_verblijfsobjecten:
+            aantalVerblijfsobjecten,
 
           aantalVerblijfsobjecten:
-            properties.aantal_verblijfsobjecten ||
-            null,
+            aantalVerblijfsobjecten,
+
+          oppervlakte,
 
           gebruiksdoel:
-            properties.gebruiksdoel ||
-            null,
+            firstDefined(
+              properties.gebruiksdoel
+            ),
 
           status:
-            properties.status ||
-            null,
+            firstDefined(
+              properties.status
+            ),
+
+          documentdatum:
+            firstDefined(
+              properties.documentdatum
+            ),
+
+          documentnummer:
+            firstDefined(
+              properties.documentnummer
+            ),
+
+          raw:
+            properties,
         };
 
         bagPandCache.set(
@@ -1702,18 +1765,14 @@ async function queryBAGPand(
         );
 
         return result;
-
       } catch (error) {
         console.warn(
           `BAG pand query mislukt: ${error.message}`
         );
 
         return null;
-
       } finally {
-        clearTimeout(
-          timeout
-        );
+        clearTimeout(timeout);
       }
     })();
 
@@ -1731,31 +1790,33 @@ async function queryBAGPand(
   }
 }
 
+/* =========================================================
+   BAG ADRES HELPERS
+========================================================= */
+
 function getBAGStreet(
-  properties
+  properties = {}
 ) {
-  return (
-    properties.openbare_ruimte_naam ||
-    properties.openbareRuimte ||
-    properties.openbare_ruimte ||
-    properties.straat ||
-    null
+  return firstDefined(
+    properties.openbare_ruimte_naam,
+    properties.openbareRuimte,
+    properties.openbare_ruimte,
+    properties.straat
   );
 }
 
 function getBAGCity(
-  properties
+  properties = {}
 ) {
-  return (
-    properties.woonplaats_naam ||
-    properties.woonplaats ||
-    properties.woonplaatsnaam ||
-    null
+  return firstDefined(
+    properties.woonplaats_naam,
+    properties.woonplaats,
+    properties.woonplaatsnaam
   );
 }
 
 function getBAGHouseNumber(
-  properties
+  properties = {}
 ) {
   const huisnummer =
     properties.huisnummer;
@@ -1786,92 +1847,177 @@ function getBAGHouseNumber(
   return result || null;
 }
 
+/* =========================================================
+   BAG NORMALISATIE
+========================================================= */
+
+function normalizeBAGProperties(
+  properties = {}
+) {
+  const aantalVerblijfsobjecten =
+    firstDefined(
+      properties.aantal_verblijfsobjecten,
+      properties.aantalVerblijfsobjecten
+    );
+
+  const identificatie =
+    getBAGVerblijfsobjectId({
+      properties,
+    });
+
+  return {
+    ...properties,
+
+    identificatie,
+
+    oppervlakte:
+      firstDefined(
+        properties.oppervlakte,
+        properties.oppervlakte_verblijfsobject
+      ),
+
+    bouwjaar:
+      firstDefined(
+        properties.bouwjaar
+      ),
+
+    aantal_verblijfsobjecten:
+      aantalVerblijfsobjecten,
+
+    aantalVerblijfsobjecten:
+      aantalVerblijfsobjecten,
+
+    gebruiksdoel:
+      firstDefined(
+        properties.gebruiksdoel
+      ),
+
+    status:
+      firstDefined(
+        properties.status
+      ),
+  };
+}
+
+/* =========================================================
+   BESTE BAG MATCH
+========================================================= */
+
 function getBestBAGFeatureForOSM(
   osm,
   features
 ) {
   if (
-    !Array.isArray(features)
+    !Array.isArray(features) ||
+    features.length === 0
   ) {
     return null;
   }
 
-  /*
-   * 1. Directe BAG-referentie.
-   */
   const osmBag =
-    osm.tags &&
-    (
-      osm.tags["ref:bag"] ||
-      osm.tags[
+    firstDefined(
+      osm?.tags?.["ref:bag"],
+      osm?.tags?.[
         "ref:bag:verblijfsobject"
       ]
     );
 
-  if (osmBag) {
+  const normalizedOsmBag =
+    normalizeBAGId(
+      osmBag
+    );
+
+  if (normalizedOsmBag) {
     const direct =
       features.find(
         feature => {
-          const id =
-            feature.properties &&
-            (
-              feature.properties
-                .identificatie ||
-              feature.properties.id
+          const bagId =
+            getBAGVerblijfsobjectId(
+              feature
             );
 
           return (
-            String(id || "") ===
-            String(osmBag)
+            normalizeBAGId(
+              bagId
+            ) ===
+            normalizedOsmBag
           );
         }
       );
 
     if (direct) {
+      console.log(
+        `BAG directe match: ${
+          osm.name || "Onbekend"
+        } -> ${
+          normalizedOsmBag
+        }`
+      );
+
       return direct;
+    }
+
+    console.log(
+      `BAG ref gevonden maar geen directe match: ${
+        osm.name || "Onbekend"
+      } -> ${
+        normalizedOsmBag
+      }`
+    );
+  }
+
+  if (
+    osm.address
+  ) {
+    const addressMatch =
+      features.find(
+        feature => {
+          const p =
+            feature.properties ||
+            {};
+
+          return addressesMatch(
+            osm.address,
+            {
+              street:
+                getBAGStreet(p),
+
+              housenumber:
+                getBAGHouseNumber(p),
+
+              postcode:
+                firstDefined(
+                  p.postcode
+                ),
+            }
+          );
+        }
+      );
+
+    if (addressMatch) {
+      console.log(
+        `BAG adres-match: ${
+          osm.name || "Onbekend"
+        }`
+      );
+
+      return addressMatch;
     }
   }
 
-  /*
-   * 2. Adres.
-   */
-  const addressMatch =
-    features.find(
-      feature => {
-        const p =
-          feature.properties ||
-          {};
-
-        const bagStreet =
-          getBAGStreet(p);
-
-        const bagHouse =
-          getBAGHouseNumber(p);
-
-        return addressesMatch(
-          osm.address,
-          {
-            street:
-              bagStreet,
-
-            housenumber:
-              bagHouse,
-          }
-        );
-      }
-    );
-
-  if (addressMatch) {
-    return addressMatch;
+  if (
+    !Number.isFinite(
+      Number(osm.latitude)
+    ) ||
+    !Number.isFinite(
+      Number(osm.longitude)
+    )
+  ) {
+    return null;
   }
 
-  /*
-   * 3. Nabijgelegen BAG-object.
-   */
   let best = null;
-
-  let bestDistance =
-    Infinity;
+  let bestDistance = Infinity;
 
   for (
     const feature of features
@@ -1881,16 +2027,10 @@ function getBestBAGFeatureForOSM(
 
     if (
       !geometry ||
+      geometry.type !== "Point" ||
       !Array.isArray(
         geometry.coordinates
       )
-    ) {
-      continue;
-    }
-
-    if (
-      geometry.type !==
-      "Point"
     ) {
       continue;
     }
@@ -1914,26 +2054,37 @@ function getBestBAGFeatureForOSM(
 
     const d =
       distanceMeters(
-        osm.latitude,
-        osm.longitude,
+        Number(osm.latitude),
+        Number(osm.longitude),
         lat,
         lon
       );
 
     if (
-      d <= 15 &&
+      d <= 30 &&
       d < bestDistance
     ) {
-      best =
-        feature;
-
-      bestDistance =
-        d;
+      best = feature;
+      bestDistance = d;
     }
+  }
+
+  if (best) {
+    console.log(
+      `BAG afstand-match: ${
+        osm.name || "Onbekend"
+      } -> ${Math.round(
+        bestDistance
+      )}m`
+    );
   }
 
   return best;
 }
+
+/* =========================================================
+   BAG PANDEN VERZAMELEN
+========================================================= */
 
 function collectRequiredBAGPandHrefs(
   features,
@@ -1945,13 +2096,6 @@ function collectRequiredBAGPandHrefs(
   for (
     const feature of features
   ) {
-    const type =
-      getBAGType(feature);
-
-    if (!type) {
-      continue;
-    }
-
     const href =
       getBAGPandHref(
         feature
@@ -2023,6 +2167,10 @@ async function enrichBAGFeaturesWithPand(
   return features;
 }
 
+/* =========================================================
+   BAG OBJECTEN
+========================================================= */
+
 function processBAGObjects(
   features,
   latitude,
@@ -2048,8 +2196,7 @@ function processBAGObjects(
 
     if (
       !geometry ||
-      geometry.type !==
-        "Point" ||
+      geometry.type !== "Point" ||
       !Array.isArray(
         geometry.coordinates
       )
@@ -2088,9 +2235,14 @@ function processBAGObjects(
       continue;
     }
 
-    const p =
+    const originalProperties =
       feature.properties ||
       {};
+
+    const p =
+      normalizeBAGProperties(
+        originalProperties
+      );
 
     const street =
       getBAGStreet(p);
@@ -2099,19 +2251,18 @@ function processBAGObjects(
       getBAGHouseNumber(p);
 
     const postcode =
-      p.postcode ||
-      null;
+      firstDefined(
+        p.postcode,
+        p.postcode_woonplaats
+      );
 
     const city =
       getBAGCity(p);
 
     const address = {
       street,
-
       housenumber,
-
       postcode,
-
       city,
     };
 
@@ -2135,11 +2286,52 @@ function processBAGObjects(
           )
         : null;
 
+    const bagDetails = {
+      verblijfsobjectIdentificatie:
+        getBAGVerblijfsobjectId(
+          feature
+        ),
+
+      oppervlakte:
+        p.oppervlakte ??
+        null,
+
+      bouwjaar:
+        pand?.bouwjaar ??
+        p.bouwjaar ??
+        null,
+
+      aantal_verblijfsobjecten:
+        pand?.aantal_verblijfsobjecten ??
+        null,
+
+      aantalVerblijfsobjecten:
+        pand?.aantalVerblijfsobjecten ??
+        null,
+
+      gebruiksdoel:
+        pand?.gebruiksdoel ??
+        p.gebruiksdoel ??
+        null,
+
+      status:
+        pand?.status ??
+        p.status ??
+        null,
+
+      pandIdentificatie:
+        pand?.identificatie ??
+        getBAGPandId(feature),
+
+      pand,
+    };
+
     results.push({
       id:
         `bag-${
-          p.identificatie ||
-          feature.id ||
+          getBAGVerblijfsobjectId(
+            feature
+          ) ||
           `${lat}-${lon}`
         }`,
 
@@ -2170,11 +2362,650 @@ function processBAGObjects(
       bag: p,
 
       pand,
+
+      bagDetails,
     });
   }
 
   return results;
 }
+
+/* =========================================================
+   LRK KINDEROPVANG
+========================================================= */
+
+// 🟨 GEWIJZIGD:
+// LRK wordt gekoppeld aan de reeds opgehaalde BAG-features.
+//
+// Matchvolgorde:
+// 1. Exact BAG-ID
+// 2. Adres
+// 3. Coördinaten binnen 30 meter
+//
+// Hierdoor zijn kleine verschillen in BAG-ID-formaat,
+// adresvelden of data-opmaak geen reden om een LRK-locatie
+// te verliezen.
+
+function processLRKChildcare(
+  records,
+  bagFeatures,
+  latitude,
+  longitude,
+  radius
+) {
+  if (
+    !Array.isArray(records) ||
+    !Array.isArray(bagFeatures)
+  ) {
+    return [];
+  }
+
+  const results = [];
+
+  let matchedByBagId = 0;
+  let matchedByAddress = 0;
+  let matchedByDistance = 0;
+  let noMatch = 0;
+  let outsideRadius = 0;
+
+  /*
+   * -------------------------------------------------------
+   * 1. BAG-index maken
+   * -------------------------------------------------------
+   */
+
+  const bagById = new Map();
+
+  for (
+    const feature of bagFeatures
+  ) {
+    const bagId =
+      normalizeBAGId(
+        getBAGVerblijfsobjectId(
+          feature
+        )
+      );
+
+    if (!bagId) {
+      continue;
+    }
+
+    bagById.set(
+      bagId,
+      feature
+    );
+  }
+
+  console.log(
+    `LRK/BAG index: ${bagById.size} BAG-ID's beschikbaar`
+  );
+
+  /*
+   * -------------------------------------------------------
+   * 2. LRK-records verwerken
+   * -------------------------------------------------------
+   */
+
+  for (
+    const record of records
+  ) {
+    if (!record) {
+      continue;
+    }
+
+    const lrkBagId =
+      normalizeBAGId(
+        record.bagId
+      );
+
+    let bagFeature = null;
+
+    /*
+     * -----------------------------------------------------
+     * MATCH 1: DIRECT BAG-ID
+     * -----------------------------------------------------
+     */
+
+    if (lrkBagId) {
+      bagFeature =
+        bagById.get(
+          lrkBagId
+        );
+
+      if (bagFeature) {
+        matchedByBagId++;
+      }
+    }
+
+    /*
+     * -----------------------------------------------------
+     * MATCH 2: ADRES
+     * -----------------------------------------------------
+     *
+     * Dit is een fallback voor LRK-locaties waarbij het
+     * BAG-ID niet exact overeenkomt.
+     * -----------------------------------------------------
+     */
+
+    if (!bagFeature) {
+      const lrkAddress = {
+        street:
+          record.address ||
+          null,
+
+        housenumber:
+          null,
+
+        postcode:
+          record.postcode ||
+          null,
+      };
+
+      /*
+       * Het LRK-adres staat bijvoorbeeld als:
+       *
+       * "Kerklaan 4"
+       *
+       * Daarom proberen we straat + huisnummer uit het
+       * adres te halen.
+       */
+
+      const addressText =
+        String(
+          record.address || ""
+        ).trim();
+
+      const houseMatch =
+        addressText.match(
+          /^(.*?)[,\s]+(\d+[A-Za-z]?(?:[-/]\d+)?)$/
+        );
+
+      if (houseMatch) {
+        lrkAddress.street =
+          houseMatch[1].trim();
+
+        lrkAddress.housenumber =
+          houseMatch[2].trim();
+      }
+
+      const addressMatch =
+        bagFeatures.find(
+          feature => {
+            const p =
+              feature.properties ||
+              {};
+
+            return addressesMatch(
+              lrkAddress,
+              {
+                street:
+                  getBAGStreet(p),
+
+                housenumber:
+                  getBAGHouseNumber(p),
+
+                postcode:
+                  firstDefined(
+                    p.postcode,
+                    p.postcode_woonplaats
+                  ),
+              }
+            );
+          }
+        );
+
+      if (addressMatch) {
+        bagFeature =
+          addressMatch;
+
+        matchedByAddress++;
+      }
+    }
+
+    /*
+     * -----------------------------------------------------
+     * MATCH 3: NABIJHEID
+     * -----------------------------------------------------
+     *
+     * Alleen gebruiken als het LRK-record zelf
+     * coördinaten bevat.
+     */
+
+    if (
+      !bagFeature &&
+      Number.isFinite(
+        Number(record.latitude)
+      ) &&
+      Number.isFinite(
+        Number(record.longitude)
+      )
+    ) {
+      let best = null;
+      let bestDistance =
+        Infinity;
+
+      for (
+        const feature of bagFeatures
+      ) {
+        const geometry =
+          feature.geometry;
+
+        if (
+          !geometry ||
+          geometry.type !== "Point" ||
+          !Array.isArray(
+            geometry.coordinates
+          )
+        ) {
+          continue;
+        }
+
+        const bagLon =
+          Number(
+            geometry.coordinates[0]
+          );
+
+        const bagLat =
+          Number(
+            geometry.coordinates[1]
+          );
+
+        if (
+          !Number.isFinite(
+            bagLat
+          ) ||
+          !Number.isFinite(
+            bagLon
+          )
+        ) {
+          continue;
+        }
+
+        const d =
+          distanceMeters(
+            Number(record.latitude),
+            Number(record.longitude),
+            bagLat,
+            bagLon
+          );
+
+        if (
+          d <= 30 &&
+          d < bestDistance
+        ) {
+          best =
+            feature;
+
+          bestDistance =
+            d;
+        }
+      }
+
+      if (best) {
+        bagFeature =
+          best;
+
+        matchedByDistance++;
+      }
+    }
+
+    /*
+     * -----------------------------------------------------
+     * Geen BAG-match
+     * -----------------------------------------------------
+     */
+
+    if (!bagFeature) {
+      noMatch++;
+
+      /*
+       * Specifieke debug voor Nijntje.
+       */
+
+      if (
+        String(record.lrkId) ===
+        "300248544"
+      ) {
+        console.warn(
+          "LRK DEBUG: Nijntje heeft GEEN BAG-match."
+        );
+
+        console.warn(
+          `LRK BAG-ID: ${lrkBagId}`
+        );
+
+        console.warn(
+          `LRK adres: ${record.address || "-"}`
+        );
+
+        console.warn(
+          `LRK postcode: ${record.postcode || "-"}`
+        );
+      }
+
+      continue;
+    }
+
+    /*
+     * -----------------------------------------------------
+     * BAG-coördinaten
+     * -----------------------------------------------------
+     */
+
+    const geometry =
+      bagFeature.geometry;
+
+    if (
+      !geometry ||
+      geometry.type !== "Point" ||
+      !Array.isArray(
+        geometry.coordinates
+      )
+    ) {
+      continue;
+    }
+
+    const lon =
+      Number(
+        geometry.coordinates[0]
+      );
+
+    const lat =
+      Number(
+        geometry.coordinates[1]
+      );
+
+    if (
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lon)
+    ) {
+      continue;
+    }
+
+    const distance =
+      distanceMeters(
+        latitude,
+        longitude,
+        lat,
+        lon
+      );
+
+    if (
+      distance > radius
+    ) {
+      outsideRadius++;
+
+      continue;
+    }
+
+    /*
+     * -----------------------------------------------------
+     * BAG gegevens
+     * -----------------------------------------------------
+     */
+
+    const bagProperties =
+      normalizeBAGProperties(
+        bagFeature.properties ||
+          {}
+      );
+
+    const street =
+      getBAGStreet(
+        bagProperties
+      );
+
+    const housenumber =
+      getBAGHouseNumber(
+        bagProperties
+      );
+
+    const postcode =
+      firstDefined(
+        bagProperties.postcode,
+        record.postcode
+      );
+
+    const city =
+      firstDefined(
+        getBAGCity(
+          bagProperties
+        ),
+        record.city
+      );
+
+    const address = {
+      street:
+        street ||
+        record.address ||
+        null,
+
+      housenumber,
+
+      postcode,
+
+      city,
+    };
+
+    /*
+     * -----------------------------------------------------
+     * LRK object
+     * -----------------------------------------------------
+     */
+
+    const type =
+      "daycare";
+
+    const pandHref =
+      getBAGPandHref(
+        bagFeature
+      );
+
+    const pand =
+      pandHref
+        ? (
+            bagPandCache.get(
+              pandHref
+            ) || null
+          )
+        : null;
+
+    const result = {
+      id:
+        record.id ||
+        `lrk-${record.lrkId}`,
+
+      name:
+        record.name ||
+        "Kinderopvang",
+
+      type,
+
+      latitude: lat,
+
+      longitude: lon,
+
+      distance:
+        Math.round(
+          distance
+        ),
+
+      priority:
+        priorityForType(
+          type
+        ),
+
+      address,
+
+      source: "LRK",
+
+      confidence: "high",
+
+      // 🟨 GEWIJZIGD:
+      // Origineel LRK-type behouden.
+      lrkType:
+        record.type ||
+        null,
+
+      childPlaces:
+        record.childPlaces ??
+        null,
+
+      lrk: {
+        lrkId:
+          record.lrkId ||
+          null,
+
+        type:
+          record.type ||
+          null,
+
+        childPlaces:
+          record.childPlaces ??
+          null,
+
+        municipality:
+          record.municipality ||
+          null,
+
+        website:
+          record.website ||
+          null,
+      },
+
+      // 🟨 GEWIJZIGD:
+      // BAG-ID expliciet aan het LRK-object koppelen.
+      bagId:
+        normalizeBAGId(
+          getBAGVerblijfsobjectId(
+            bagFeature
+          )
+        ) ||
+        lrkBagId,
+
+      bag: {
+        ...bagProperties,
+
+        identificatie:
+          normalizeBAGId(
+            getBAGVerblijfsobjectId(
+              bagFeature
+            )
+          ) ||
+          lrkBagId,
+      },
+
+      pand,
+
+      bagDetails: {
+        verblijfsobjectIdentificatie:
+          normalizeBAGId(
+            getBAGVerblijfsobjectId(
+              bagFeature
+            )
+          ) ||
+          lrkBagId,
+
+        oppervlakte:
+          bagProperties.oppervlakte ??
+          null,
+
+        bouwjaar:
+          pand?.bouwjaar ??
+          bagProperties.bouwjaar ??
+          null,
+
+        aantal_verblijfsobjecten:
+          pand?.aantal_verblijfsobjecten ??
+          null,
+
+        aantalVerblijfsobjecten:
+          pand?.aantalVerblijfsobjecten ??
+          null,
+
+        gebruiksdoel:
+          pand?.gebruiksdoel ??
+          bagProperties.gebruiksdoel ??
+          null,
+
+        status:
+          pand?.status ??
+          bagProperties.status ??
+          null,
+
+        pandIdentificatie:
+          pand?.identificatie ??
+          getBAGPandId(
+            bagFeature
+          ),
+
+        pand,
+      },
+    };
+
+    /*
+     * Specifieke controle voor Nijntje.
+     */
+
+    if (
+      String(record.lrkId) ===
+      "300248544"
+    ) {
+      console.log(
+        "LRK DEBUG: Nijntje succesvol gekoppeld!"
+      );
+
+      console.log(
+        `  BAG-ID: ${result.bagId}`
+      );
+
+      console.log(
+        `  Coördinaten: ${lat}, ${lon}`
+      );
+
+      console.log(
+        `  Afstand: ${Math.round(distance)}m`
+      );
+    }
+
+    results.push(
+      result
+    );
+  }
+
+  // 🟨 GEWIJZIGD:
+  // Uitgebreide logging om LRK/BAG-koppeling te controleren.
+
+  console.log(
+    `LRK koppeling resultaat: ${results.length} objecten`
+  );
+
+  console.log(
+    `  Match via BAG-ID: ${matchedByBagId}`
+  );
+
+  console.log(
+    `  Match via adres: ${matchedByAddress}`
+  );
+
+  console.log(
+    `  Match via afstand: ${matchedByDistance}`
+  );
+
+  console.log(
+    `  Geen BAG-match: ${noMatch}`
+  );
+
+  console.log(
+    `  Buiten radius: ${outsideRadius}`
+  );
+
+  return results;
+}
+
+/* =========================================================
+   OSM MET BAG VERRIJKEN
+========================================================= */
 
 function enrichOSMWithBAG(
   osmObjects,
@@ -2201,27 +3032,139 @@ function enrichOSMWithBAG(
       );
 
     if (!match) {
+      console.log(
+        `GEEN BAG-MATCH: ${
+          osm.name || "Onbekend"
+        }`
+      );
+
       continue;
     }
 
-    const properties =
+    const originalProperties =
       match.properties ||
       {};
 
-    osm.bag =
-      properties;
+    const properties =
+      normalizeBAGProperties(
+        originalProperties
+      );
+
+    const bagId =
+      getBAGVerblijfsobjectId(
+        match
+      );
 
     const pandHref =
       getBAGPandHref(
         match
       );
 
-    if (pandHref) {
-      osm.pand =
-        bagPandCache.get(
-          pandHref
-        ) || null;
+    const pand =
+      pandHref
+        ? (
+            bagPandCache.get(
+              pandHref
+            ) || null
+          )
+        : null;
+
+    osm.bag =
+      properties;
+
+    osm.bagId =
+      bagId;
+
+    osm.pand =
+      pand;
+
+    osm.pandHref =
+      pandHref ||
+      null;
+
+    osm.bagDetails = {
+      verblijfsobjectIdentificatie:
+        bagId,
+
+      oppervlakte:
+        properties.oppervlakte ??
+        null,
+
+      bouwjaar:
+        pand?.bouwjaar ??
+        properties.bouwjaar ??
+        null,
+
+      aantal_verblijfsobjecten:
+        pand?.aantal_verblijfsobjecten ??
+        null,
+
+      aantalVerblijfsobjecten:
+        pand?.aantalVerblijfsobjecten ??
+        null,
+
+      gebruiksdoel:
+        pand?.gebruiksdoel ??
+        properties.gebruiksdoel ??
+        null,
+
+      status:
+        pand?.status ??
+        properties.status ??
+        null,
+
+      pandIdentificatie:
+        pand?.identificatie ??
+        getBAGPandId(match),
+
+      pand,
+    };
+
+    if (
+      !osm.address ||
+      (
+        !osm.address.street &&
+        !osm.address.housenumber &&
+        !osm.address.postcode &&
+        !osm.address.city
+      )
+    ) {
+      osm.address = {
+        street:
+          getBAGStreet(
+            properties
+          ),
+
+        housenumber:
+          getBAGHouseNumber(
+            properties
+          ),
+
+        postcode:
+          firstDefined(
+            properties.postcode
+          ),
+
+        city:
+          getBAGCity(
+            properties
+          ),
+      };
     }
+
+    console.log(
+      `BAG gekoppeld aan OSM: ${
+        osm.name || "Onbekend"
+      } | BAG ${
+        bagId || "-"
+      } | pand ${
+        pand?.identificatie ||
+        "-"
+      } | oppervlakte ${
+        properties.oppervlakte ??
+        "-"
+      }`
+    );
   }
 }
 
@@ -2234,13 +3177,15 @@ function deduplicateObjects(
 ) {
   const result = [];
 
-  /*
-   * DUO > OSM > BAG
-   */
+  // 🟨 GEWIJZIGD:
+  // LRK krijgt voorrang op OSM en BAG.
+  // DUO blijft de primaire bron voor scholen.
+
   const sourcePriority = {
     DUO: 1,
-    OSM: 2,
-    BAG: 3,
+    LRK: 2,
+    OSM: 3,
+    BAG: 4,
   };
 
   const sorted =
@@ -2280,18 +3225,21 @@ function deduplicateObjects(
       false;
 
     const objectBagId =
-      object.bag &&
-      (
-        object.bag
-          .identificatie ||
-        object.bag.id
+      normalizeBAGId(
+        object.bagId ||
+        (
+          object.bag &&
+          (
+            object.bag.identificatie ||
+            object.bag.id
+          )
+        )
       );
 
     const objectPandId =
       object.pand &&
-      (
-        object.pand
-          .identificatie ||
+      normalizeBAGId(
+        object.pand.identificatie ||
         object.pand.id
       );
 
@@ -2299,58 +3247,44 @@ function deduplicateObjects(
       const existing of result
     ) {
       const existingBagId =
-        existing.bag &&
-        (
-          existing.bag
-            .identificatie ||
-          existing.bag.id
+        normalizeBAGId(
+          existing.bagId ||
+          (
+            existing.bag &&
+            (
+              existing.bag.identificatie ||
+              existing.bag.id
+            )
+          )
         );
 
       const existingPandId =
         existing.pand &&
-        (
-          existing.pand
-            .identificatie ||
+        normalizeBAGId(
+          existing.pand.identificatie ||
           existing.pand.id
         );
 
-      /*
-       * Zelfde BAG verblijfsobject.
-       */
       if (
         objectBagId &&
         existingBagId &&
-        String(
-          objectBagId
-        ) ===
-          String(
-            existingBagId
-          )
+        objectBagId ===
+          existingBagId
       ) {
         duplicate = true;
         break;
       }
 
-      /*
-       * Zelfde BAG pand.
-       */
       if (
         objectPandId &&
         existingPandId &&
-        String(
-          objectPandId
-        ) ===
-          String(
-            existingPandId
-          )
+        objectPandId ===
+          existingPandId
       ) {
         duplicate = true;
         break;
       }
 
-      /*
-       * Zelfde type + exact adres.
-       */
       if (
         object.type ===
           existing.type &&
@@ -2363,9 +3297,6 @@ function deduplicateObjects(
         break;
       }
 
-      /*
-       * DUO-school is leidend.
-       */
       if (
         object.type ===
           "school" &&
@@ -2405,9 +3336,6 @@ function deduplicateObjects(
         }
       }
 
-      /*
-       * Algemene fysieke dubbele objecten.
-       */
       if (
         object.type ===
           existing.type &&
@@ -2571,7 +3499,7 @@ app.get(
       );
 
       /* -----------------------------------------------------
-         4. BAG aan OSM koppelen
+         4. BAG AAN OSM KOPPELEN
       ----------------------------------------------------- */
 
       enrichOSMWithBAG(
@@ -2580,17 +3508,42 @@ app.get(
       );
 
       /* -----------------------------------------------------
-         5. COMBINEREN
+         5. LRK
       ----------------------------------------------------- */
+
+      // 🟨 GEWIJZIGD:
+      // LRK koppelen aan de BAG-features die al voor
+      // deze zoekopdracht zijn opgehaald.
+
+      const lrkObjects =
+        processLRKChildcare(
+          lrkChildcare,
+          bagFeatures,
+          latitude,
+          longitude,
+          radius
+        );
+
+      console.log(
+        `LRK-kinderopvang binnen radius: ${lrkObjects.length}`
+      );
+
+      /* -----------------------------------------------------
+         6. COMBINEREN
+      ----------------------------------------------------- */
+
+      // 🟨 GEWIJZIGD:
+      // LRK toegevoegd als zelfstandige bron.
 
       const combined = [
         ...duoObjects,
+        ...lrkObjects,
         ...osmObjects,
         ...bagObjects,
       ];
 
       /* -----------------------------------------------------
-         6. DEDUPLICEREN
+         7. DEDUPLICEREN
       ----------------------------------------------------- */
 
       const objects =
@@ -2599,7 +3552,7 @@ app.get(
         );
 
       /* -----------------------------------------------------
-         7. SORTEREN
+         8. SORTEREN
       ----------------------------------------------------- */
 
       objects.sort(
@@ -2609,7 +3562,7 @@ app.get(
             b.priority
           ) {
             return (
-              a.priority - 
+              a.priority -
               b.priority
             );
           }
@@ -2628,7 +3581,6 @@ app.get(
       res.json(
         objects
       );
-
     } catch (error) {
       console.error(
         "Fout vulnerable-objects:",
@@ -2669,6 +3621,10 @@ app.get(
 
       duoSchoolsLoaded:
         duoSchools.length,
+
+      // 🟨 GEWIJZIGD
+      lrkChildcareLoaded:
+        lrkChildcare.length,
     });
   }
 );
@@ -2686,6 +3642,11 @@ app.listen(
 
     console.log(
       `DUO-scholen beschikbaar: ${duoSchools.length}`
+    );
+
+    // 🟨 GEWIJZIGD
+    console.log(
+      `LRK-kinderopvang beschikbaar: ${lrkChildcare.length}`
     );
   }
 );

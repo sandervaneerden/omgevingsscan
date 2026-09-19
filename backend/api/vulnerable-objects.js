@@ -12,31 +12,40 @@ const MAX_RADIUS = 5000;
 
 /*
  * DUO-scholen
- *
- * Het bestand bevat ongeveer 8.600 scholen en is door het bestaande
- * importproces al voorzien van betrouwbare coördinaten.
- *
- * require() zorgt er tevens voor dat Vercel het bestand als onderdeel
- * van de function kan meenemen.
  */
 let duoSchools = [];
 
 try {
-  const duoPath = path.join(__dirname, "..", "data", "duo-schools.json");
+  const duoPath = path.join(
+    __dirname,
+    "..",
+    "data",
+    "duo-schools.json"
+  );
 
   if (fs.existsSync(duoPath)) {
-    duoSchools = JSON.parse(fs.readFileSync(duoPath, "utf8"));
+    duoSchools = JSON.parse(
+      fs.readFileSync(duoPath, "utf8")
+    );
 
     if (!Array.isArray(duoSchools)) {
       duoSchools = [];
     }
 
-    console.log(`DUO scholen geladen: ${duoSchools.length}`);
+    console.log(
+      `DUO scholen geladen: ${duoSchools.length}`
+    );
   } else {
-    console.warn(`DUO bestand niet gevonden: ${duoPath}`);
+    console.warn(
+      `DUO bestand niet gevonden: ${duoPath}`
+    );
   }
 } catch (error) {
-  console.error("Fout bij laden DUO-scholen:", error);
+  console.error(
+    "Fout bij laden DUO-scholen:",
+    error
+  );
+
   duoSchools = [];
 }
 
@@ -96,7 +105,10 @@ function normalizeStreet(value) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/straat|str\.|weg|laan|plein|singel|dreef|kade|pad|laan$/g, "")
+    .replace(
+      /straat|str\.|weg|laan|plein|singel|dreef|kade|pad|laan$/g,
+      ""
+    )
     .replace(/[^a-z0-9]+/g, "")
     .trim();
 }
@@ -108,11 +120,19 @@ function normalizeHouseNumber(value) {
     .trim();
 }
 
-function distanceInMeters(lat1, lon1, lat2, lon2) {
+function distanceInMeters(
+  lat1,
+  lon1,
+  lat2,
+  lon2
+) {
   const R = 6371000;
 
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const dLat =
+    ((lat2 - lat1) * Math.PI) / 180;
+
+  const dLon =
+    ((lon2 - lon1) * Math.PI) / 180;
 
   const a =
     Math.sin(dLat / 2) ** 2 +
@@ -120,7 +140,12 @@ function distanceInMeters(lat1, lon1, lat2, lon2) {
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) ** 2;
 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const c =
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    );
 
   return R * c;
 }
@@ -129,19 +154,6 @@ function distanceInMeters(lat1, lon1, lat2, lon2) {
  * Zorgclassificatie
  * --------------------------------------------------------- */
 
-/*
- * Alleen zorg die voor een omgevingsscan daadwerkelijk relevant
- * kan zijn wordt hier als kwetsbare zorg aangemerkt.
- *
- * Belangrijk:
- * - tandarts -> NIET opnemen als algemene zorg
- * - fysiotherapie -> NIET opnemen
- * - apotheek -> NIET opnemen
- * - prothesepraktijk -> NIET opnemen
- *
- * Deze locaties kunnen later eventueel als aparte categorie
- * worden toegevoegd, maar zijn nu geen primaire kwetsbare objecten.
- */
 function determineCareType(tags = {}) {
   const text = [
     tags.name,
@@ -203,9 +215,7 @@ function determineCareType(tags = {}) {
     return "disability_care";
   }
 
-  if (
-    /jonx\b|dignis\b/.test(text)
-  ) {
+  if (/jonx\b|dignis\b/.test(text)) {
     return "disability_care";
   }
 
@@ -221,7 +231,9 @@ function determineCareType(tags = {}) {
    * --------------------------------------------- */
 
   if (
-    /hospice|palliatieve zorg|palliatief/.test(text)
+    /hospice|palliatieve zorg|palliatief/.test(
+      text
+    )
   ) {
     return "hospice";
   }
@@ -262,10 +274,6 @@ function determineCareType(tags = {}) {
 
   /* ---------------------------------------------
    * Kliniek
-   *
-   * Alleen als de kliniek daadwerkelijk een instelling
-   * is. Kleine behandelpraktijken vallen hier niet automatisch
-   * onder.
    * --------------------------------------------- */
 
   if (
@@ -285,32 +293,104 @@ function determineCareType(tags = {}) {
 
   /* ---------------------------------------------
    * Huisarts
-   *
-   * Wel relevant als zorgvoorziening, maar niet hetzelfde
-   * als een ziekenhuis/verpleeghuis.
    * --------------------------------------------- */
 
   if (
     healthcare === "doctor" ||
     healthcare === "general_practitioner" ||
     amenity === "doctors" ||
-    /\b(huisarts|huisartsenpraktijk)\b/.test(text)
+    /\b(huisarts|huisartsenpraktijk)\b/.test(
+      text
+    )
   ) {
     return "doctor";
   }
 
+  return null;
+}
+
+/* ---------------------------------------------------------
+ * 🟨 Kinderopvang
+ * --------------------------------------------------------- */
+
+function determineChildcareType(tags = {}) {
+  const text = [
+    tags.name,
+    tags["name:nl"],
+    tags.official_name,
+    tags["official_name:nl"],
+    tags.alt_name,
+    tags.description,
+    tags.operator,
+    tags["operator:type"],
+    tags["childcare:type"],
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const amenity = String(
+    tags.amenity || ""
+  ).toLowerCase();
+
+  const childcare = String(
+    tags.childcare || ""
+  ).toLowerCase();
+
+  const childcareType = String(
+    tags["childcare:type"] || ""
+  ).toLowerCase();
+
   /*
-   * Alles wat hieronder staat wordt bewust NIET als
-   * kwetsbare zorglocatie toegevoegd.
-   *
-   * dentist
-   * physiotherapist
-   * pharmacy
-   * optician
-   * podiatrist
-   * prosthetics
-   * etc.
+   * Officiële OSM-tags
    */
+
+  if (
+    amenity === "kindergarten" ||
+    amenity === "childcare"
+  ) {
+    return "kindergarten";
+  }
+
+  if (childcare) {
+    return "kindergarten";
+  }
+
+  if (
+    childcareType === "daycare" ||
+    childcareType === "preschool" ||
+    childcareType === "after_school" ||
+    childcareType === "kindergarten"
+  ) {
+    return "kindergarten";
+  }
+
+  /*
+   * Nederlandse benamingen
+   */
+
+  if (
+    /\bkinderdagverblijf\b/.test(text) ||
+    /\bkinderdagopvang\b/.test(text) ||
+    /\bkinderopvang\b/.test(text) ||
+    /\bpeuterspeelzaal\b/.test(text) ||
+    /\bpeuteropvang\b/.test(text) ||
+    /\bbuitenschoolse opvang\b/.test(text) ||
+    /\bvoor[- ]?en naschoolse opvang\b/.test(text) ||
+    /\bcr[eè]che\b/.test(text) ||
+    /\bdaycare\b/.test(text) ||
+    /\bchildcare\b/.test(text)
+  ) {
+    return "kindergarten";
+  }
+
+  /*
+   * BSO wordt vaak alleen als BSO geregistreerd.
+   */
+
+  if (/\bbso\b/.test(text)) {
+    return "kindergarten";
+  }
 
   return null;
 }
@@ -320,16 +400,39 @@ function determineCareType(tags = {}) {
  * --------------------------------------------------------- */
 
 function determineType(tags = {}) {
-  const careType = determineCareType(tags);
+  /*
+   * 🟨 Kinderopvang wordt als eerste gecontroleerd.
+   */
+
+  const childcareType =
+    determineChildcareType(tags);
+
+  if (childcareType) {
+    return childcareType;
+  }
+
+  const careType =
+    determineCareType(tags);
 
   if (careType) {
     return careType;
   }
 
-  const amenity = String(tags.amenity || "").toLowerCase();
-  const building = String(tags.building || "").toLowerCase();
-  const landuse = String(tags.landuse || "").toLowerCase();
-  const shop = String(tags.shop || "").toLowerCase();
+  const amenity = String(
+    tags.amenity || ""
+  ).toLowerCase();
+
+  const building = String(
+    tags.building || ""
+  ).toLowerCase();
+
+  const landuse = String(
+    tags.landuse || ""
+  ).toLowerCase();
+
+  const shop = String(
+    tags.shop || ""
+  ).toLowerCase();
 
   /* Onderwijs */
 
@@ -397,86 +500,112 @@ function determineType(tags = {}) {
  * --------------------------------------------------------- */
 
 function getDuoSchoolType(school) {
-  const type = String(school?.type || "").toLowerCase();
+  const type = String(
+    school?.type || ""
+  ).toLowerCase();
 
   if (
     type.includes("kindergarten") ||
-    type.includes("special") && type.includes("early")
+    (type.includes("special") &&
+      type.includes("early"))
   ) {
     return "kindergarten";
   }
 
-  /*
-   * DUO primary_school, secondary_school, special_school,
-   * practical_education etc. worden allemaal als school
-   * weergegeven.
-   */
   return "school";
 }
 
 function getDuoSchoolAddress(school) {
   return {
     street: school.street || null,
-    housenumber: school.houseNumber || null,
+    housenumber:
+      school.houseNumber || null,
     postcode: school.postcode || null,
     city: school.city || null,
   };
 }
 
-function getDuoSchools(latitude, longitude, radius) {
+function getDuoSchools(
+  latitude,
+  longitude,
+  radius
+) {
   const result = [];
 
-  if (!Array.isArray(duoSchools) || duoSchools.length === 0) {
+  if (
+    !Array.isArray(duoSchools) ||
+    duoSchools.length === 0
+  ) {
     return result;
   }
 
   for (const school of duoSchools) {
-    const lat = Number(school.latitude);
-    const lon = Number(school.longitude);
+    const lat = Number(
+      school.latitude
+    );
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    const lon = Number(
+      school.longitude
+    );
+
+    if (
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lon)
+    ) {
       continue;
     }
 
-    const distance = distanceInMeters(
-      latitude,
-      longitude,
-      lat,
-      lon
-    );
+    const distance =
+      distanceInMeters(
+        latitude,
+        longitude,
+        lat,
+        lon
+      );
 
     if (distance > radius) {
       continue;
     }
 
-    const name = school.name || "School";
+    const name =
+      school.name || "School";
 
     result.push({
       id:
         school.duo?.vestigingCode ||
         school.duo?.instellingCode ||
-        `duo-${normalizeName(name)}-${lat}-${lon}`,
+        `duo-${normalizeName(
+          name
+        )}-${lat}-${lon}`,
 
       name,
 
-      type: getDuoSchoolType(school),
+      type:
+        getDuoSchoolType(school),
 
       latitude: lat,
+
       longitude: lon,
 
-      distance: Math.round(distance),
+      distance:
+        Math.round(distance),
 
       priority: 5,
 
-      address: getDuoSchoolAddress(school),
+      address:
+        getDuoSchoolAddress(school),
 
       source: "DUO",
 
-      confidence: school.confidence || "high",
+      confidence:
+        school.confidence ||
+        "high",
 
-      duo: school.duo || null,
+      duo:
+        school.duo || null,
 
-      pdok: school.pdok || null,
+      pdok:
+        school.pdok || null,
     });
   }
 
@@ -487,31 +616,40 @@ function getDuoSchools(latitude, longitude, radius) {
  * Overpass query
  * --------------------------------------------------------- */
 
-function buildQuery(latitude, longitude, radius) {
+function buildQuery(
+  latitude,
+  longitude,
+  radius
+) {
   return `
 [out:json][timeout:30];
 
 (
   /* Zorginstellingen */
+
   nwr(around:${radius},${latitude},${longitude})["amenity"="hospital"];
   nwr(around:${radius},${latitude},${longitude})["healthcare"="hospital"];
-
   nwr(around:${radius},${latitude},${longitude})["amenity"="clinic"];
   nwr(around:${radius},${latitude},${longitude})["healthcare"="clinic"];
-
   nwr(around:${radius},${latitude},${longitude})["healthcare"="doctor"];
   nwr(around:${radius},${latitude},${longitude})["healthcare"="general_practitioner"];
   nwr(around:${radius},${latitude},${longitude})["amenity"="doctors"];
-
   nwr(around:${radius},${latitude},${longitude})["social_facility"];
   nwr(around:${radius},${latitude},${longitude})["social_facility:for"];
 
-  /* Kinderopvang */
+  /* 🟨 Kinderopvang */
+
   nwr(around:${radius},${latitude},${longitude})["amenity"="kindergarten"];
   nwr(around:${radius},${latitude},${longitude})["amenity"="childcare"];
   nwr(around:${radius},${latitude},${longitude})["childcare"];
+  nwr(around:${radius},${latitude},${longitude})["childcare:type"];
+
+  nwr(around:${radius},${latitude},${longitude})["name"~"kinderdagverblijf|kinderdagopvang|kinderopvang|peuterspeelzaal|peuteropvang|buitenschoolse opvang|BSO|creche|crèche",i];
+
+  nwr(around:${radius},${latitude},${longitude})["description"~"kinderdagverblijf|kinderdagopvang|kinderopvang|peuterspeelzaal|peuteropvang|buitenschoolse opvang|BSO|creche|crèche",i];
 
   /* Onderwijs - DUO is leidend, OSM als aanvulling */
+
   nwr(around:${radius},${latitude},${longitude})["amenity"="school"];
   nwr(around:${radius},${latitude},${longitude})["amenity"="college"];
   nwr(around:${radius},${latitude},${longitude})["amenity"="university"];
@@ -520,13 +658,16 @@ function buildQuery(latitude, longitude, radius) {
   nwr(around:${radius},${latitude},${longitude})["education"];
 
   /* Religie */
+
   nwr(around:${radius},${latitude},${longitude})["amenity"="place_of_worship"];
 
   /* Maatschappelijk */
+
   nwr(around:${radius},${latitude},${longitude})["amenity"="community_centre"];
   nwr(around:${radius},${latitude},${longitude})["amenity"="social_centre"];
 
   /* Winkels */
+
   nwr(around:${radius},${latitude},${longitude})["shop"="supermarket"];
   nwr(around:${radius},${latitude},${longitude})["shop"="mall"];
   nwr(around:${radius},${latitude},${longitude})["amenity"="marketplace"];
@@ -544,27 +685,36 @@ async function fetchFromOverpass(query) {
   let lastError = null;
 
   for (const server of OVERPASS_SERVERS) {
-    const controller = new AbortController();
+    const controller =
+      new AbortController();
 
-    const timeout = setTimeout(() => {
-      controller.abort();
-    }, 30000);
+    const timeout =
+      setTimeout(() => {
+        controller.abort();
+      }, 30000);
 
     try {
-      console.log(`Overpass proberen: ${server}`);
+      console.log(
+        `Overpass proberen: ${server}`
+      );
 
-      const response = await fetch(server, {
-        method: "POST",
+      const response =
+        await fetch(server, {
+          method: "POST",
 
-        headers: {
-          "Content-Type":
-            "application/x-www-form-urlencoded; charset=UTF-8",
-        },
+          headers: {
+            "Content-Type":
+              "application/x-www-form-urlencoded; charset=UTF-8",
+          },
 
-        body: `data=${encodeURIComponent(query)}`,
+          body:
+            `data=${encodeURIComponent(
+              query
+            )}`,
 
-        signal: controller.signal,
-      });
+          signal:
+            controller.signal,
+        });
 
       clearTimeout(timeout);
 
@@ -574,9 +724,15 @@ async function fetchFromOverpass(query) {
         );
       }
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
-      if (!data || !Array.isArray(data.elements)) {
+      if (
+        !data ||
+        !Array.isArray(
+          data.elements
+        )
+      ) {
         throw new Error(
           `Ongeldige Overpass response van ${server}`
         );
@@ -601,7 +757,8 @@ async function fetchFromOverpass(query) {
 
   console.error(
     "Alle Overpass servers mislukt:",
-    lastError?.message || "onbekende fout"
+    lastError?.message ||
+      "onbekende fout"
   );
 
   return [];
@@ -611,41 +768,42 @@ async function fetchFromOverpass(query) {
  * OSM verwerken
  * --------------------------------------------------------- */
 
-function processOSMObjects(elements, latitude, longitude) {
+function processOSMObjects(
+  elements,
+  latitude,
+  longitude
+) {
   const results = [];
 
   for (const element of elements) {
-    const tags = element.tags || {};
+    const tags =
+      element.tags || {};
 
-    const type = determineType(tags);
+    const type =
+      determineType(tags);
 
-    /*
-     * Alles wat we niet expliciet relevant vinden wordt
-     * weggegooid.
-     */
     if (!type) {
       continue;
     }
 
-    const coordinates = getCoordinates(element);
+    const coordinates =
+      getCoordinates(element);
 
     if (!coordinates) {
       continue;
     }
 
-    const distance = distanceInMeters(
-      latitude,
-      longitude,
-      coordinates.latitude,
-      coordinates.longitude
-    );
+    const distance =
+      distanceInMeters(
+        latitude,
+        longitude,
+        coordinates.latitude,
+        coordinates.longitude
+      );
 
-    const name = getName(tags);
+    const name =
+      getName(tags);
 
-    /*
-     * Voor winkels/markten/community zonder naam hebben we
-     * weinig aan het object op de kaart.
-     */
     if (
       !name &&
       (
@@ -680,19 +838,25 @@ function processOSMObjects(elements, latitude, longitude) {
     };
 
     results.push({
-      id: `osm-${element.type}-${element.id}`,
+      id:
+        `osm-${element.type}-${element.id}`,
 
-      name: name || type,
+      name:
+        name || type,
 
       type,
 
-      latitude: coordinates.latitude,
+      latitude:
+        coordinates.latitude,
 
-      longitude: coordinates.longitude,
+      longitude:
+        coordinates.longitude,
 
-      distance: Math.round(distance),
+      distance:
+        Math.round(distance),
 
-      priority: priorityForType(type),
+      priority:
+        priorityForType(type),
 
       address,
 
@@ -772,11 +936,21 @@ function sameAddress(a, b) {
     return false;
   }
 
-  const streetA = normalizeStreet(a.street);
-  const streetB = normalizeStreet(b.street);
+  const streetA =
+    normalizeStreet(a.street);
 
-  const houseA = normalizeHouseNumber(a.housenumber);
-  const houseB = normalizeHouseNumber(b.housenumber);
+  const streetB =
+    normalizeStreet(b.street);
+
+  const houseA =
+    normalizeHouseNumber(
+      a.housenumber
+    );
+
+  const houseB =
+    normalizeHouseNumber(
+      b.housenumber
+    );
 
   if (
     streetA &&
@@ -793,8 +967,11 @@ function sameAddress(a, b) {
 }
 
 function namesSimilar(a, b) {
-  const nameA = normalizeName(a);
-  const nameB = normalizeName(b);
+  const nameA =
+    normalizeName(a);
+
+  const nameB =
+    normalizeName(b);
 
   if (!nameA || !nameB) {
     return false;
@@ -819,53 +996,55 @@ function namesSimilar(a, b) {
 }
 
 function shouldDeduplicate(a, b) {
-  /*
-   * DUO + OSM school:
-   * dezelfde school op vrijwel dezelfde locatie.
-   */
   if (
     a.type === "school" &&
     b.type === "school"
   ) {
-    const distance = distanceInMeters(
-      a.latitude,
-      a.longitude,
-      b.latitude,
-      b.longitude
-    );
+    const distance =
+      distanceInMeters(
+        a.latitude,
+        a.longitude,
+        b.latitude,
+        b.longitude
+      );
 
     if (distance <= 100) {
       return true;
     }
 
     if (
-      namesSimilar(a.name, b.name) &&
-      sameAddress(a.address, b.address)
+      namesSimilar(
+        a.name,
+        b.name
+      ) &&
+      sameAddress(
+        a.address,
+        b.address
+      )
     ) {
       return true;
     }
   }
 
-  /*
-   * Zelfde zorglocatie uit verschillende OSM-objecten.
-   *
-   * Alleen dedupliceren als type én locatie duidelijk
-   * overeenkomen.
-   */
-  if (
-    a.type === b.type
-  ) {
-    const distance = distanceInMeters(
-      a.latitude,
-      a.longitude,
-      b.latitude,
-      b.longitude
-    );
+  if (a.type === b.type) {
+    const distance =
+      distanceInMeters(
+        a.latitude,
+        a.longitude,
+        b.latitude,
+        b.longitude
+      );
 
     if (distance <= 30) {
       if (
-        namesSimilar(a.name, b.name) ||
-        sameAddress(a.address, b.address)
+        namesSimilar(
+          a.name,
+          b.name
+        ) ||
+        sameAddress(
+          a.address,
+          b.address
+        )
       ) {
         return true;
       }
@@ -878,29 +1057,40 @@ function shouldDeduplicate(a, b) {
 function deduplicateObjects(objects) {
   const result = [];
 
-  /*
-   * DUO komt vóór OSM zodat DUO bij een school de
-   * leidende registratie blijft.
-   */
-  const sorted = [...objects].sort((a, b) => {
-    if (a.source === "DUO" && b.source !== "DUO") {
-      return -1;
-    }
+  const sorted =
+    [...objects].sort(
+      (a, b) => {
+        if (
+          a.source === "DUO" &&
+          b.source !== "DUO"
+        ) {
+          return -1;
+        }
 
-    if (a.source !== "DUO" && b.source === "DUO") {
-      return 1;
-    }
+        if (
+          a.source !== "DUO" &&
+          b.source === "DUO"
+        ) {
+          return 1;
+        }
 
-    return (
-      (a.priority || 99) - (b.priority || 99)
+        return (
+          (a.priority || 99) -
+          (b.priority || 99)
+        );
+      }
     );
-  });
 
   for (const object of sorted) {
     let duplicate = false;
 
     for (const existing of result) {
-      if (shouldDeduplicate(object, existing)) {
+      if (
+        shouldDeduplicate(
+          object,
+          existing
+        )
+      ) {
         duplicate = true;
         break;
       }
@@ -939,7 +1129,10 @@ function setCors(res) {
  * Vercel handler
  * --------------------------------------------------------- */
 
-module.exports = async function handler(req, res) {
+module.exports = async function handler(
+  req,
+  res
+) {
   setCors(res);
 
   if (req.method === "OPTIONS") {
@@ -948,17 +1141,23 @@ module.exports = async function handler(req, res) {
 
   if (req.method !== "GET") {
     return res.status(405).json({
-      error: "Alleen GET is toegestaan",
+      error:
+        "Alleen GET is toegestaan",
     });
   }
 
   try {
-    const latitude = Number(req.query.latitude);
-    const longitude = Number(req.query.longitude);
+    const latitude =
+      Number(req.query.latitude);
 
-    let radius = Number(
-      req.query.radius || DEFAULT_RADIUS
-    );
+    const longitude =
+      Number(req.query.longitude);
+
+    let radius =
+      Number(
+        req.query.radius ||
+          DEFAULT_RADIUS
+      );
 
     if (
       !Number.isFinite(latitude) ||
@@ -971,12 +1170,16 @@ module.exports = async function handler(req, res) {
     }
 
     if (!Number.isFinite(radius)) {
-      radius = DEFAULT_RADIUS;
+      radius =
+        DEFAULT_RADIUS;
     }
 
     radius = Math.max(
       50,
-      Math.min(radius, MAX_RADIUS)
+      Math.min(
+        radius,
+        MAX_RADIUS
+      )
     );
 
     console.log(
@@ -987,11 +1190,12 @@ module.exports = async function handler(req, res) {
      * 1. DUO
      * --------------------------------------------- */
 
-    const duoObjects = getDuoSchools(
-      latitude,
-      longitude,
-      radius
-    );
+    const duoObjects =
+      getDuoSchools(
+        latitude,
+        longitude,
+        radius
+      );
 
     console.log(
       `DUO scholen binnen ${radius}m: ${duoObjects.length}`
@@ -1001,14 +1205,17 @@ module.exports = async function handler(req, res) {
      * 2. OSM / Overpass
      * --------------------------------------------- */
 
-    const query = buildQuery(
-      latitude,
-      longitude,
-      radius
-    );
+    const query =
+      buildQuery(
+        latitude,
+        longitude,
+        radius
+      );
 
     const elements =
-      await fetchFromOverpass(query);
+      await fetchFromOverpass(
+        query
+      );
 
     const osmObjects =
       processOSMObjects(
@@ -1035,26 +1242,32 @@ module.exports = async function handler(req, res) {
      * --------------------------------------------- */
 
     const objects =
-      deduplicateObjects(combined);
+      deduplicateObjects(
+        combined
+      );
 
     /* ---------------------------------------------
      * 5. Sorteren
      * --------------------------------------------- */
 
-    objects.sort((a, b) => {
-      const priorityDifference =
-        (a.priority || 99) -
-        (b.priority || 99);
+    objects.sort(
+      (a, b) => {
+        const priorityDifference =
+          (a.priority || 99) -
+          (b.priority || 99);
 
-      if (priorityDifference !== 0) {
-        return priorityDifference;
+        if (
+          priorityDifference !== 0
+        ) {
+          return priorityDifference;
+        }
+
+        return (
+          (a.distance || 0) -
+          (b.distance || 0)
+        );
       }
-
-      return (
-        (a.distance || 0) -
-        (b.distance || 0)
-      );
-    });
+    );
 
     /* ---------------------------------------------
      * 6. Statistieken
@@ -1064,7 +1277,8 @@ module.exports = async function handler(req, res) {
 
     for (const object of objects) {
       counts[object.type] =
-        (counts[object.type] || 0) + 1;
+        (counts[object.type] || 0) +
+        1;
     }
 
     console.log(
@@ -1078,14 +1292,20 @@ module.exports = async function handler(req, res) {
 
       meta: {
         latitude,
+
         longitude,
+
         radius,
 
-        total: objects.length,
+        total:
+          objects.length,
 
         sources: {
-          DUO: duoObjects.length,
-          OSM: osmObjects.length,
+          DUO:
+            duoObjects.length,
+
+          OSM:
+            osmObjects.length,
         },
 
         counts,
@@ -1100,7 +1320,9 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({
       error:
         "Kon kwetsbare objecten niet ophalen",
-      details: error.message,
+
+      details:
+        error.message,
     });
   }
 };
