@@ -7,6 +7,8 @@ import MapView from "./components/MapView";
 
 import {
   getWeather,
+  // 🟨 GEWIJZIGD
+  getBeaufort,
 } from "./services/weatherService";
 
 import type {
@@ -1796,12 +1798,10 @@ function App() {
                   windSpeedKmh / 3.6;
 
 
+                // 🟨 GEWIJZIGD: gebruikt nu dezelfde
+                // Beaufort-berekening als WeatherPanel
                 const beaufort =
-                  Math.floor(
-                    windSpeedKmh === 0
-                      ? 0
-                      : 0
-                  );
+                  getBeaufort(windSpeedKmh);
 
 
                 const windDirection =
