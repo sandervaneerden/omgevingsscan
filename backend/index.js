@@ -31,7 +31,6 @@ const DUO_SCHOOLS_PATH = path.join(
   "duo-schools.json"
 );
 
-// 🟨 GEWIJZIGD: LRK-bestand toegevoegd
 const LRK_CHILDCARE_PATH = path.join(
   __dirname,
   "data",
@@ -60,6 +59,7 @@ try {
       console.error(
         "DUO-bestand bevat geen array."
       );
+
       duoSchools = [];
     } else {
       console.log(
@@ -83,8 +83,6 @@ try {
 /* =========================================================
    LRK
 ========================================================= */
-
-// 🟨 GEWIJZIGD: LRK kinderopvang laden
 
 let lrkChildcare = [];
 
@@ -176,17 +174,6 @@ function normalizePostcode(value) {
     .replace(/\s+/g, "")
     .trim();
 }
-
-/*
- * BAG-identificaties kunnen als:
- *
- * 1895100000006952
- *
- * of bijvoorbeeld als URI worden aangeleverd.
- *
- * Daarom vergelijken we altijd de laatste
- * betekenisvolle ID-component.
- */
 
 function normalizeBAGId(value) {
   if (
@@ -688,6 +675,16 @@ function namesMatch(
   );
 }
 
+/*
+ * Algemene adresmatch.
+ *
+ * Deze functie blijft bewust redelijk breed voor bestaande
+ * OSM/BAG-deduplicatie.
+ *
+ * Voor LRK gebruiken we hieronder een aparte, strengere
+ * functie: lrkAddressesMatch().
+ */
+
 function addressesMatch(
   addressA = {},
   addressB = {}
@@ -745,6 +742,126 @@ function addressesMatch(
   }
 
   return false;
+}
+
+/* =========================================================
+   LRK ADRESMATCH
+========================================================= */
+
+// 🟨 GEWIJZIGD:
+//
+// Strenge adrescontrole uitsluitend voor LRK.
+//
+// Belangrijk:
+// straat + huisnummer alleen is NIET voldoende.
+//
+// Als beide postcodes bekend zijn, moeten die exact
+// overeenkomen.
+//
+// Als één of beide postcodes ontbreken, gebruiken we
+// de woonplaats als aanvullende controle.
+//
+// Hiermee voorkomen we bijvoorbeeld:
+//
+// LRK:
+// Oosterstraat 3A
+// 7413 XV Deventer
+//
+// BAG:
+// Oosterstraat 3A
+// 9679 KJ Scheemda
+//
+// Dit mag NOOIT als dezelfde locatie worden gezien.
+
+function lrkAddressesMatch(
+  lrkAddress = {},
+  bagAddress = {}
+) {
+  const streetA =
+    normalizeStreet(
+      lrkAddress.street
+    );
+
+  const streetB =
+    normalizeStreet(
+      bagAddress.street
+    );
+
+  const houseA =
+    normalizeHouseNumber(
+      lrkAddress.housenumber
+    );
+
+  const houseB =
+    normalizeHouseNumber(
+      bagAddress.housenumber
+    );
+
+  const postcodeA =
+    normalizePostcode(
+      lrkAddress.postcode
+    );
+
+  const postcodeB =
+    normalizePostcode(
+      bagAddress.postcode
+    );
+
+  /*
+   * LRK -> BAG is bewust een zeer strenge koppeling.
+   *
+   * Alle drie moeten aanwezig zijn:
+   *
+   * 1. postcode
+   * 2. straat
+   * 3. huisnummer
+   *
+   * Ontbreekt één van deze gegevens?
+   * Dan GEEN LRK/BAG-match.
+   */
+
+  if (
+    !postcodeA ||
+    !postcodeB ||
+    !streetA ||
+    !streetB ||
+    !houseA ||
+    !houseB
+  ) {
+    return false;
+  }
+
+  /*
+   * Postcode moet exact overeenkomen.
+   */
+
+  if (
+    postcodeA !== postcodeB
+  ) {
+    return false;
+  }
+
+  /*
+   * Straat moet overeenkomen.
+   */
+
+  if (
+    streetA !== streetB
+  ) {
+    return false;
+  }
+
+  /*
+   * Huisnummer moet overeenkomen.
+   */
+
+  if (
+    houseA !== houseB
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 /* =========================================================
@@ -2371,20 +2488,167 @@ function processBAGObjects(
 }
 
 /* =========================================================
+   LRK ADRES PARSER
+========================================================= */
+
+// 🟨 GEWIJZIGD:
+// Ook de officiële LRK-woonplaats wordt meegenomen.
+// Dit is nodig wanneer een postcode ontbreekt of als
+// aanvullende controle.
+
+function parseLRKAddress(
+  record
+) {
+  const addressText =
+    String(
+      record?.address || ""
+    ).trim();
+
+  const result = {
+    street: null,
+
+    housenumber: null,
+
+    postcode:
+      record?.postcode ||
+      null,
+
+    city:
+      record?.city ||
+      null,
+  };
+
+  if (!addressText) {
+    return result;
+  }
+
+  /*
+   * Voorbeelden:
+   *
+   * Kerklaan 4
+   * Oosterstraat 3A
+   * Hoofdweg 12-14
+   */
+
+  const houseMatch =
+    addressText.match(
+      /^(.*?)[,\s]+(\d+[A-Za-z]?(?:[-/]\d+)?)$/
+    );
+
+  if (houseMatch) {
+    result.street =
+      houseMatch[1].trim();
+
+    result.housenumber =
+      houseMatch[2].trim();
+  } else {
+    result.street =
+      addressText;
+  }
+
+  return result;
+}
+
+/* =========================================================
+   LRK ADRESCONTROLE
+========================================================= */
+
+// 🟨 GEWIJZIGD:
+//
+// LRK/BAG-ID-match wordt nu gecontroleerd met de
+// strenge lrkAddressesMatch().
+//
+// Een BAG-ID alleen is dus NIET voldoende.
+//
+// Ook wordt hier niet meer geprobeerd om straat +
+// huisnummer en postcode + huisnummer afzonderlijk
+// goed te keuren. Dat was de oorzaak van de fout.
+
+function validateLRKBAGMatch(
+  record,
+  bagFeature
+) {
+  if (
+    !record ||
+    !bagFeature
+  ) {
+    return false;
+  }
+
+  const lrkAddress =
+    parseLRKAddress(
+      record
+    );
+
+  const p =
+    bagFeature.properties ||
+    {};
+
+  const bagAddress = {
+    street:
+      getBAGStreet(p),
+
+    housenumber:
+      getBAGHouseNumber(p),
+
+    postcode:
+      firstDefined(
+        p.postcode,
+        p.postcode_woonplaats
+      ),
+
+    city:
+      getBAGCity(p),
+  };
+
+  const match =
+    lrkAddressesMatch(
+      lrkAddress,
+      bagAddress
+    );
+
+  if (match) {
+    return true;
+  }
+
+  console.warn(
+    "LRK/BAG MATCH AFGEWEZEN:",
+    record.name || "Onbekend",
+    "| LRK:",
+    record.address || "-",
+    record.postcode || "-",
+    record.city || "-",
+    "| BAG:",
+    bagAddress.street || "-",
+    bagAddress.housenumber || "-",
+    bagAddress.postcode || "-",
+    bagAddress.city || "-"
+  );
+
+  return false;
+}
+
+/* =========================================================
    LRK KINDEROPVANG
 ========================================================= */
 
 // 🟨 GEWIJZIGD:
-// LRK wordt gekoppeld aan de reeds opgehaalde BAG-features.
 //
 // Matchvolgorde:
-// 1. Exact BAG-ID
-// 2. Adres
+//
+// 1. Exact BAG-ID + strenge adrescontrole
+// 2. Exact LRK-adres + strenge adrescontrole
 // 3. Coördinaten binnen 30 meter
 //
-// Hierdoor zijn kleine verschillen in BAG-ID-formaat,
-// adresvelden of data-opmaak geen reden om een LRK-locatie
-// te verliezen.
+// Belangrijk:
+//
+// Een BAG-ID alleen is NIET voldoende.
+//
+// Een straat + huisnummer alleen is ook NIET voldoende
+// voor LRK.
+//
+// Hierdoor kan een locatie uit een andere plaats niet
+// meer via een gelijk straat/huisnummer worden gekoppeld.
 
 function processLRKChildcare(
   records,
@@ -2405,14 +2669,13 @@ function processLRKChildcare(
   let matchedByBagId = 0;
   let matchedByAddress = 0;
   let matchedByDistance = 0;
+  let rejectedBagIdAddress = 0;
   let noMatch = 0;
   let outsideRadius = 0;
 
-  /*
-   * -------------------------------------------------------
-   * 1. BAG-index maken
-   * -------------------------------------------------------
-   */
+  /* -------------------------------------------------------
+     BAG-ID index
+  ------------------------------------------------------- */
 
   const bagById = new Map();
 
@@ -2420,13 +2683,26 @@ function processLRKChildcare(
     const feature of bagFeatures
   ) {
     const bagId =
-      normalizeBAGId(
-        getBAGVerblijfsobjectId(
-          feature
-        )
-      );
+  normalizeBAGId(
+   getBAGVerblijfsobjectId(
+  feature
+)
+  );
 
     if (!bagId) {
+      continue;
+    }
+
+    /*
+     * Alleen echte BAG-verblijfsobject-ID's
+     * van 16 cijfers gebruiken.
+     */
+
+    if (
+      !/^\d{16}$/.test(
+        bagId
+      )
+    ) {
       continue;
     }
 
@@ -2437,14 +2713,12 @@ function processLRKChildcare(
   }
 
   console.log(
-    `LRK/BAG index: ${bagById.size} BAG-ID's beschikbaar`
+    `LRK/BAG index: ${bagById.size} geldige BAG-ID's beschikbaar`
   );
 
-  /*
-   * -------------------------------------------------------
-   * 2. LRK-records verwerken
-   * -------------------------------------------------------
-   */
+  /* -------------------------------------------------------
+     LRK-records verwerken
+  ------------------------------------------------------- */
 
   for (
     const record of records
@@ -2460,73 +2734,61 @@ function processLRKChildcare(
 
     let bagFeature = null;
 
-    /*
-     * -----------------------------------------------------
-     * MATCH 1: DIRECT BAG-ID
-     * -----------------------------------------------------
-     */
+    /* -----------------------------------------------------
+       MATCH 1: EXACT BAG-ID
+    ----------------------------------------------------- */
 
-    if (lrkBagId) {
-      bagFeature =
+    if (
+      lrkBagId &&
+      /^\d{16}$/.test(
+        lrkBagId
+      )
+    ) {
+      const candidate =
         bagById.get(
           lrkBagId
         );
 
-      if (bagFeature) {
-        matchedByBagId++;
+      if (candidate) {
+        /*
+         * 🟨 GEWIJZIGD:
+         *
+         * Een exact BAG-ID is alleen geldig als
+         * het adres óók overeenkomt met LRK.
+         */
+
+        if (
+          validateLRKBAGMatch(
+            record,
+            candidate
+          )
+        ) {
+          bagFeature =
+            candidate;
+
+          matchedByBagId++;
+        } else {
+          rejectedBagIdAddress++;
+
+          /*
+           * ID bestaat wel, maar het BAG-adres
+           * komt niet overeen.
+           *
+           * Dus deze feature wordt niet gebruikt.
+           */
+        }
       }
     }
 
-    /*
-     * -----------------------------------------------------
-     * MATCH 2: ADRES
-     * -----------------------------------------------------
-     *
-     * Dit is een fallback voor LRK-locaties waarbij het
-     * BAG-ID niet exact overeenkomt.
-     * -----------------------------------------------------
-     */
+    /* -----------------------------------------------------
+       MATCH 2: ADRES
+    ----------------------------------------------------- */
 
     if (!bagFeature) {
-      const lrkAddress = {
-        street:
-          record.address ||
-          null,
-
-        housenumber:
-          null,
-
-        postcode:
-          record.postcode ||
-          null,
-      };
-
-      /*
-       * Het LRK-adres staat bijvoorbeeld als:
-       *
-       * "Kerklaan 4"
-       *
-       * Daarom proberen we straat + huisnummer uit het
-       * adres te halen.
-       */
-
-      const addressText =
-        String(
-          record.address || ""
-        ).trim();
-
-      const houseMatch =
-        addressText.match(
-          /^(.*?)[,\s]+(\d+[A-Za-z]?(?:[-/]\d+)?)$/
+      const lrkAddress =
+        parseLRKAddress(
+          record
         );
-
-      if (houseMatch) {
-        lrkAddress.street =
-          houseMatch[1].trim();
-
-        lrkAddress.housenumber =
-          houseMatch[2].trim();
-      }
 
       const addressMatch =
         bagFeatures.find(
@@ -2535,21 +2797,32 @@ function processLRKChildcare(
               feature.properties ||
               {};
 
-            return addressesMatch(
+            const bagAddress = {
+              street:
+                getBAGStreet(p),
+
+              housenumber:
+                getBAGHouseNumber(p),
+
+              postcode:
+                firstDefined(
+                  p.postcode,
+                  p.postcode_woonplaats
+                ),
+
+              city:
+                getBAGCity(p),
+            };
+
+            /*
+             * 🟨 GEWIJZIGD:
+             *
+             * Gebruik uitsluitend de strenge LRK-match.
+             */
+
+            return lrkAddressesMatch(
               lrkAddress,
-              {
-                street:
-                  getBAGStreet(p),
-
-                housenumber:
-                  getBAGHouseNumber(p),
-
-                postcode:
-                  firstDefined(
-                    p.postcode,
-                    p.postcode_woonplaats
-                  ),
-              }
+              bagAddress
             );
           }
         );
@@ -2562,104 +2835,22 @@ function processLRKChildcare(
       }
     }
 
-    /*
-     * -----------------------------------------------------
-     * MATCH 3: NABIJHEID
-     * -----------------------------------------------------
-     *
-     * Alleen gebruiken als het LRK-record zelf
-     * coördinaten bevat.
-     */
+    /* -----------------------------------------------------
+       MATCH 3: COÖRDINATEN
+    ----------------------------------------------------- */
 
-    if (
-      !bagFeature &&
-      Number.isFinite(
-        Number(record.latitude)
-      ) &&
-      Number.isFinite(
-        Number(record.longitude)
-      )
-    ) {
-      let best = null;
-      let bestDistance =
-        Infinity;
-
-      for (
-        const feature of bagFeatures
-      ) {
-        const geometry =
-          feature.geometry;
-
-        if (
-          !geometry ||
-          geometry.type !== "Point" ||
-          !Array.isArray(
-            geometry.coordinates
-          )
-        ) {
-          continue;
-        }
-
-        const bagLon =
-          Number(
-            geometry.coordinates[0]
-          );
-
-        const bagLat =
-          Number(
-            geometry.coordinates[1]
-          );
-
-        if (
-          !Number.isFinite(
-            bagLat
-          ) ||
-          !Number.isFinite(
-            bagLon
-          )
-        ) {
-          continue;
-        }
-
-        const d =
-          distanceMeters(
-            Number(record.latitude),
-            Number(record.longitude),
-            bagLat,
-            bagLon
-          );
-
-        if (
-          d <= 30 &&
-          d < bestDistance
-        ) {
-          best =
-            feature;
-
-          bestDistance =
-            d;
-        }
-      }
-
-      if (best) {
-        bagFeature =
-          best;
-
-        matchedByDistance++;
-      }
-    }
-
-    /*
-     * -----------------------------------------------------
-     * Geen BAG-match
-     * -----------------------------------------------------
-     */
+   
+    /* -----------------------------------------------------
+       GEEN MATCH
+    ----------------------------------------------------- */
 
     if (!bagFeature) {
       noMatch++;
 
       /*
-       * Specifieke debug voor Nijntje.
+       * 🟨 GEWIJZIGD:
+       *
+       * Algemene debug voor een aantal specifieke testrecords.
        */
 
       if (
@@ -2681,16 +2872,43 @@ function processLRKChildcare(
         console.warn(
           `LRK postcode: ${record.postcode || "-"}`
         );
+
+        console.warn(
+          `LRK plaats: ${record.city || "-"}`
+        );
+      }
+
+      if (
+        String(record.lrkId) ===
+        "869184465"
+      ) {
+        console.warn(
+          "LRK DEBUG: Kastanjeboom heeft GEEN BAG-match."
+        );
+
+        console.warn(
+          `LRK BAG-ID: ${lrkBagId || "-"}`
+        );
+
+        console.warn(
+          `LRK adres: ${record.address || "-"}`
+        );
+
+        console.warn(
+          `LRK postcode: ${record.postcode || "-"}`
+        );
+
+        console.warn(
+          `LRK plaats: ${record.city || "-"}`
+        );
       }
 
       continue;
     }
 
-    /*
-     * -----------------------------------------------------
-     * BAG-coördinaten
-     * -----------------------------------------------------
-     */
+    /* -----------------------------------------------------
+       BAG-COÖRDINATEN
+    ----------------------------------------------------- */
 
     const geometry =
       bagFeature.geometry;
@@ -2738,11 +2956,9 @@ function processLRKChildcare(
       continue;
     }
 
-    /*
-     * -----------------------------------------------------
-     * BAG gegevens
-     * -----------------------------------------------------
-     */
+    /* -----------------------------------------------------
+       BAG GEGEVENS
+    ----------------------------------------------------- */
 
     const bagProperties =
       normalizeBAGProperties(
@@ -2774,24 +2990,30 @@ function processLRKChildcare(
         record.city
       );
 
+    const parsedLRKAddress =
+      parseLRKAddress(
+        record
+      );
+
     const address = {
       street:
         street ||
-        record.address ||
+        parsedLRKAddress.street ||
         null,
 
-      housenumber,
+      housenumber:
+        housenumber ||
+        parsedLRKAddress.housenumber ||
+        null,
 
       postcode,
 
       city,
     };
 
-    /*
-     * -----------------------------------------------------
-     * LRK object
-     * -----------------------------------------------------
-     */
+    /* -----------------------------------------------------
+       LRK OBJECT
+    ----------------------------------------------------- */
 
     const type =
       "daycare";
@@ -2809,6 +3031,14 @@ function processLRKChildcare(
             ) || null
           )
         : null;
+
+    const finalBagId =
+      normalizeBAGId(
+        getBAGVerblijfsobjectId(
+          bagFeature
+        )
+      ) ||
+      lrkBagId;
 
     const result = {
       id:
@@ -2841,8 +3071,6 @@ function processLRKChildcare(
 
       confidence: "high",
 
-      // 🟨 GEWIJZIGD:
-      // Origineel LRK-type behouden.
       lrkType:
         record.type ||
         null,
@@ -2873,38 +3101,21 @@ function processLRKChildcare(
           null,
       },
 
-      // 🟨 GEWIJZIGD:
-      // BAG-ID expliciet aan het LRK-object koppelen.
       bagId:
-        normalizeBAGId(
-          getBAGVerblijfsobjectId(
-            bagFeature
-          )
-        ) ||
-        lrkBagId,
+        finalBagId,
 
       bag: {
         ...bagProperties,
 
         identificatie:
-          normalizeBAGId(
-            getBAGVerblijfsobjectId(
-              bagFeature
-            )
-          ) ||
-          lrkBagId,
+          finalBagId,
       },
 
       pand,
 
       bagDetails: {
         verblijfsobjectIdentificatie:
-          normalizeBAGId(
-            getBAGVerblijfsobjectId(
-              bagFeature
-            )
-          ) ||
-          lrkBagId,
+          finalBagId,
 
         oppervlakte:
           bagProperties.oppervlakte ??
@@ -2943,9 +3154,9 @@ function processLRKChildcare(
       },
     };
 
-    /*
-     * Specifieke controle voor Nijntje.
-     */
+    /* -----------------------------------------------------
+       DEBUG NIJNTJE
+    ----------------------------------------------------- */
 
     if (
       String(record.lrkId) ===
@@ -2968,20 +3179,74 @@ function processLRKChildcare(
       );
     }
 
+    /* -----------------------------------------------------
+       DEBUG KASTANJEBOOM
+    ----------------------------------------------------- */
+
+    if (
+      String(record.lrkId) ===
+      "869184465"
+    ) {
+      console.log(
+        "LRK DEBUG: BSO Kastanjeboom verwerkt."
+      );
+
+      console.log(
+        `  LRK adres: ${record.address || "-"}`
+      );
+
+      console.log(
+        `  LRK postcode: ${record.postcode || "-"}`
+      );
+
+      console.log(
+        `  LRK plaats: ${record.city || "-"}`
+      );
+
+      console.log(
+        `  LRK BAG-ID: ${lrkBagId || "-"}`
+      );
+
+      console.log(
+        `  BAG-ID resultaat: ${finalBagId || "-"}`
+      );
+
+      console.log(
+        `  BAG adres: ${address.street || "-"} ${address.housenumber || ""}`
+      );
+
+      console.log(
+        `  BAG postcode: ${address.postcode || "-"}`
+      );
+
+      console.log(
+        `  BAG plaats: ${address.city || "-"}`
+      );
+
+      console.log(
+        `  Afstand: ${Math.round(distance)}m`
+      );
+    }
+
     results.push(
       result
     );
   }
 
-  // 🟨 GEWIJZIGD:
-  // Uitgebreide logging om LRK/BAG-koppeling te controleren.
+  /* -------------------------------------------------------
+     LOGGING
+  ------------------------------------------------------- */
 
   console.log(
     `LRK koppeling resultaat: ${results.length} objecten`
   );
 
   console.log(
-    `  Match via BAG-ID: ${matchedByBagId}`
+    `  Match via BAG-ID + adrescontrole: ${matchedByBagId}`
+  );
+
+  console.log(
+    `  BAG-ID match afgewezen wegens adres: ${rejectedBagIdAddress}`
   );
 
   console.log(
@@ -3176,10 +3441,6 @@ function deduplicateObjects(
   objects
 ) {
   const result = [];
-
-  // 🟨 GEWIJZIGD:
-  // LRK krijgt voorrang op OSM en BAG.
-  // DUO blijft de primaire bron voor scholen.
 
   const sourcePriority = {
     DUO: 1,
@@ -3459,17 +3720,38 @@ app.get(
       /* -----------------------------------------------------
          3. BAG
       ----------------------------------------------------- */
+let bagFeatures =
+  await queryBAG(
+    latitude,
+    longitude,
+    radius
+  );
 
-      const bagFeatures =
-        await queryBAG(
-          latitude,
-          longitude,
-          radius
+const bagVoorFilter =
+  bagFeatures.length;
+
+bagFeatures =
+  bagFeatures.filter(
+    feature => {
+      const status =
+        normalizeText(
+          feature?.properties?.status
         );
 
-      console.log(
-        `BAG-verblijfsobjecten gevonden: ${bagFeatures.length}`
+      return (
+        status !==
+        "verblijfsobject ingetrokken"
       );
+    }
+  );
+
+console.log(
+  `BAG-verblijfsobjecten gevonden: ${bagVoorFilter}`
+);
+
+console.log(
+  `BAG-verblijfsobjecten actief: ${bagFeatures.length}`
+);
 
       const requiredPandHrefs =
         collectRequiredBAGPandHrefs(
@@ -3511,10 +3793,6 @@ app.get(
          5. LRK
       ----------------------------------------------------- */
 
-      // 🟨 GEWIJZIGD:
-      // LRK koppelen aan de BAG-features die al voor
-      // deze zoekopdracht zijn opgehaald.
-
       const lrkObjects =
         processLRKChildcare(
           lrkChildcare,
@@ -3531,9 +3809,6 @@ app.get(
       /* -----------------------------------------------------
          6. COMBINEREN
       ----------------------------------------------------- */
-
-      // 🟨 GEWIJZIGD:
-      // LRK toegevoegd als zelfstandige bron.
 
       const combined = [
         ...duoObjects,
@@ -3562,8 +3837,7 @@ app.get(
             b.priority
           ) {
             return (
-              a.priority -
-              b.priority
+              a.priority - b.priority
             );
           }
 
@@ -3622,7 +3896,6 @@ app.get(
       duoSchoolsLoaded:
         duoSchools.length,
 
-      // 🟨 GEWIJZIGD
       lrkChildcareLoaded:
         lrkChildcare.length,
     });
@@ -3644,7 +3917,6 @@ app.listen(
       `DUO-scholen beschikbaar: ${duoSchools.length}`
     );
 
-    // 🟨 GEWIJZIGD
     console.log(
       `LRK-kinderopvang beschikbaar: ${lrkChildcare.length}`
     );
