@@ -2582,6 +2582,47 @@ function processLRKChildcare(
     `LRK/BAG index: ${bagById.size} geldige BAG-ID's beschikbaar`
   );
 
+  const bagByAddress =
+    new Map();
+
+  for (
+    const feature of bagFeatures
+  ) {
+    const p =
+      feature.properties ||
+      {};
+
+    const key =
+      [
+        normalizePostcode(
+          firstDefined(
+            p.postcode,
+            p.postcode_woonplaats
+          )
+        ),
+        normalizeStreet(
+          getBAGStreet(p)
+        ),
+        normalizeHouseNumber(
+          getBAGHouseNumber(p)
+        ),
+      ].join("|");
+
+    if (
+      key !== "||" &&
+      !bagByAddress.has(key)
+    ) {
+      bagByAddress.set(
+        key,
+        feature
+      );
+    }
+  }
+
+  console.log(
+    `LRK/BAG adres-index: ${bagByAddress.size} unieke adressen beschikbaar`
+  );
+
   /* -------------------------------------------------------
      LRK-records verwerken
   ------------------------------------------------------- */
@@ -2656,48 +2697,61 @@ function processLRKChildcare(
           record
         );
 
+      const addressKey =
+        [
+          normalizePostcode(
+            lrkAddress.postcode
+          ),
+          normalizeStreet(
+            lrkAddress.street
+          ),
+          normalizeHouseNumber(
+            lrkAddress.housenumber
+          ),
+        ].join("|");
+
       const addressMatch =
-        bagFeatures.find(
-          feature => {
-            const p =
-              feature.properties ||
-              {};
-
-            const bagAddress = {
-              street:
-                getBAGStreet(p),
-
-              housenumber:
-                getBAGHouseNumber(p),
-
-              postcode:
-                firstDefined(
-                  p.postcode,
-                  p.postcode_woonplaats
-                ),
-
-              city:
-                getBAGCity(p),
-            };
-
-            /*
-             * 🟨 GEWIJZIGD:
-             *
-             * Gebruik uitsluitend de strenge LRK-match.
-             */
-
-            return lrkAddressesMatch(
-              lrkAddress,
-              bagAddress
-            );
-          }
+        bagByAddress.get(
+          addressKey
         );
 
       if (addressMatch) {
-        bagFeature =
-          addressMatch;
+        /*
+         * Extra strenge controle blijft behouden.
+         * De index versnelt alleen het zoeken.
+         */
+        const p =
+          addressMatch.properties ||
+          {};
 
-        matchedByAddress++;
+        const bagAddress = {
+          street:
+            getBAGStreet(p),
+
+          housenumber:
+            getBAGHouseNumber(p),
+
+          postcode:
+            firstDefined(
+              p.postcode,
+              p.postcode_woonplaats
+            ),
+
+          city:
+            getBAGCity(p),
+        };
+
+        if (
+          lrkAddressesMatch(
+            lrkAddress,
+            bagAddress
+          )
+        ) {
+          bagFeature =
+            addressMatch;
+
+          matchedByAddress++;
+        }
       }
     }
 
