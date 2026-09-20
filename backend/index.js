@@ -1458,14 +1458,6 @@ function getBAGType(
 
   if (
     gebruiksdoel.includes(
-      "bijeenkomstfunctie"
-    )
-  ) {
-    return "community";
-  }
-
-  if (
-    gebruiksdoel.includes(
       "logiesfunctie"
     )
   ) {
