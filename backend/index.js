@@ -1143,13 +1143,20 @@ async function queryOverpassGet(
   }
 }
 
-async function queryOverpass(
-  latitude,
-  longitude,
-  radius
-) {
-  console.log("OSM/Overpass uitgeschakeld.");
-
+async function queryOverpass(latitude, longitude, radius) {
+  const servers = ["https://overpass-api.de/api/interpreter"];
+  const query = "[out:json][timeout:3];(nwr[amenity](around:" + radius + "," + latitude + "," + longitude + ");nwr[leisure](around:" + radius + "," + latitude + "," + longitude + ");nwr[tourism](around:" + radius + "," + latitude + "," + longitude + ");nwr[shop](around:" + radius + "," + latitude + "," + longitude + "););out center tags;";
+  for (const server of servers) {
+    try {
+      console.log("OSM/Overpass ophalen via " + server);
+      const elements = await queryOverpassGet(server, 4000, query);
+      console.log("OSM-objecten opgehaald: " + elements.length);
+      return elements;
+    } catch (error) {
+      console.warn("OSM/Overpass mislukt: " + error.message);
+    }
+  }
+  console.warn("OSM/Overpass niet beschikbaar; doorgaan zonder OSM.");
   return [];
 }
 
