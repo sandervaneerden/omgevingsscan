@@ -14,6 +14,7 @@ app.use(express.json());
 ========================================================= */
 
 const OVERPASS_SERVERS = [
+  "http://lz4.overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
@@ -1599,13 +1600,6 @@ function getBAGType(
     return "hotel";
   }
 
-  if (
-    gebruiksdoel.includes(
-      "winkelfunctie"
-    )
-  ) {
-    return "shop";
-  }
 
   return null;
 }
